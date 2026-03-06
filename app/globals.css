@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@layer utilities {
+  .gradient-text {
+    background: linear-gradient(to right, #93c5fd, #c7d2fe);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    color: transparent;
+  }
+  
+  .blur-bg {
+    filter: blur(80px);
+  }
+}
