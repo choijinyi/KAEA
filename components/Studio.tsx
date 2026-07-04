@@ -24,6 +24,14 @@ export default function Studio() {
   const [apiKeySaved, setApiKeySaved] = useState(false);
 
   useEffect(() => {
+    // URL 해시(#gemini-key=...)로 전달된 키는 저장 후 주소에서 즉시 제거한다
+    // (해시는 서버로 전송되지 않는다)
+    const match = window.location.hash.match(/gemini-key=([^&]+)/);
+    if (match) {
+      const key = decodeURIComponent(match[1]).trim();
+      if (key) localStorage.setItem(API_KEY_STORAGE, key);
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
     const saved = localStorage.getItem(API_KEY_STORAGE) ?? '';
     setApiKey(saved);
     setApiKeySaved(!!saved);
@@ -369,7 +377,7 @@ export default function Studio() {
               키를 등록하면 브라우저에서 AI를 직접 호출해 <b className="text-zinc-300">파일 크기 제한 없이</b> 가사 추출·배경 생성이 가능해요.
               키는 이 브라우저에만 저장되며, 구글 Gemini API 호출에만 사용됩니다.{' '}
               <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="text-violet-400 underline">
-                무료 발급 (AIza…로 시작)
+                무료 발급 (AQ.… 또는 AIza…로 시작)
               </a>
             </p>
           </div>
@@ -382,7 +390,7 @@ export default function Studio() {
                 value={apiKeyInput}
                 onChange={e => setApiKeyInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && saveApiKey()}
-                placeholder="AIza…"
+                placeholder="AQ.… 또는 AIza…"
                 className="input w-full sm:w-64"
               />
               <button onClick={saveApiKey} disabled={!apiKeyInput.trim()} className="btn-primary shrink-0">

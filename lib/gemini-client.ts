@@ -11,7 +11,7 @@ function friendly(e: unknown): Error {
   const msg = e instanceof Error ? e.message : String(e);
   if (/API key not valid|API_KEY_INVALID|PERMISSION_DENIED|401|403/i.test(msg)) {
     return new Error(
-      'API 키가 유효하지 않습니다. Google AI Studio(aistudio.google.com/apikey)에서 발급한 "AIza"로 시작하는 키인지 확인해 주세요.',
+      'API 키가 유효하지 않습니다. Google AI Studio(aistudio.google.com/apikey)에서 발급한 키("AQ." 또는 "AIza"로 시작)인지 확인해 주세요.',
     );
   }
   if (/quota|RESOURCE_EXHAUSTED|429/i.test(msg)) {
