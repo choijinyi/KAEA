@@ -24,6 +24,7 @@ export interface Answer {
 export interface BingoGame {
   code: string;
   title: string;
+  mode: 'quiz' | 'classic';
   answers: Answer[];
   created_at: string;
   updated_at: string;
@@ -86,7 +87,7 @@ export function matchAnswer(name: string, answers: Answer[]): Answer | undefined
 export async function fetchGame(code: string): Promise<BingoGame | null> {
   const {data, error} = await supabase
     .from('bingo_games')
-    .select('code, title, answers, created_at, updated_at')
+    .select('code, title, mode, answers, created_at, updated_at')
     .eq('code', code.toUpperCase())
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -100,8 +101,8 @@ export async function createGame(title: string): Promise<BingoGame> {
     const code = generateGameCode();
     const {data, error} = await supabase
       .from('bingo_games')
-      .insert({code, title, names: [], called: [], answers: []})
-      .select('code, title, answers, created_at, updated_at')
+      .insert({code, title, mode: 'quiz', names: [], called: [], answers: []})
+      .select('code, title, mode, answers, created_at, updated_at')
       .single();
     if (!error) return data as BingoGame;
     lastError = error.message;

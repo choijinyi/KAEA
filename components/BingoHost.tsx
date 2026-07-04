@@ -39,8 +39,10 @@ export default function BingoHost({resumeCode}: {resumeCode?: string}) {
     }
     fetchGame(resumeCode)
       .then(found => {
-        if (found) setGame(found);
-        else setError(`코드 ${resumeCode.toUpperCase()} 게임을 찾을 수 없습니다.`);
+        if (!found) setError(`코드 ${resumeCode.toUpperCase()} 게임을 찾을 수 없습니다.`);
+        else if (found.mode === 'classic')
+          setError(`코드 ${found.code}는 클래식 빙고 게임이에요. 클래식 빙고 진행자 화면을 이용해주세요.`);
+        else setGame(found);
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));

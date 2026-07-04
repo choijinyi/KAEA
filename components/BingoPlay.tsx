@@ -88,8 +88,10 @@ function JoinPanel({
     setError('');
     try {
       const game = await fetchGame(clean);
-      if (game) onJoined(game);
-      else setError(`코드 ${clean} 게임을 찾을 수 없어요. 코드를 다시 확인해주세요.`);
+      if (!game) setError(`코드 ${clean} 게임을 찾을 수 없어요. 코드를 다시 확인해주세요.`);
+      else if (game.mode === 'classic')
+        setError(`코드 ${game.code}는 클래식 빙고 게임이에요. 클래식 빙고 참가 화면을 이용해주세요.`);
+      else onJoined(game);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
