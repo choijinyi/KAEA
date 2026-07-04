@@ -10,12 +10,40 @@ import {
   type TranscribeResult,
 } from '@/lib/types';
 import { drawFrame, renderVideo, VIDEO_H, VIDEO_W, type RenderHandle, type SceneConfig } from '@/lib/render';
+import { generateBackgroundWithUserKey, transcribeWithUserKey } from '@/lib/gemini-client';
 
 const MAX_AI_BYTES = 4 * 1024 * 1024;
+const API_KEY_STORAGE = 'playlist-studio-gemini-key';
 
 type BgMode = 'ai' | 'gradient';
 
 export default function Studio() {
+  // 0. API 키 (브라우저에만 저장 — 등록 시 크기 제한 없이 브라우저에서 직접 AI 호출)
+  const [apiKey, setApiKey] = useState('');
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [apiKeySaved, setApiKeySaved] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(API_KEY_STORAGE) ?? '';
+    setApiKey(saved);
+    setApiKeySaved(!!saved);
+  }, []);
+
+  const saveApiKey = () => {
+    const key = apiKeyInput.trim();
+    if (!key) return;
+    localStorage.setItem(API_KEY_STORAGE, key);
+    setApiKey(key);
+    setApiKeySaved(true);
+    setApiKeyInput('');
+  };
+
+  const clearApiKey = () => {
+    localStorage.removeItem(API_KEY_STORAGE);
+    setApiKey('');
+    setApiKeySaved(false);
+  };
+
   // 1. 장르
   const [genreId, setGenreId] = useState('lofi');
   const genre = getGenre(genreId);
@@ -122,17 +150,26 @@ export default function Studio() {
   const transcribe = async () => {
     if (!audioFile) return;
     setSubtitleError('');
-    if (audioFile.size > MAX_AI_BYTES) {
-      setSubtitleError('AI 가사 추출은 4MB 이하 파일만 지원합니다. 아래에 가사를 직접 붙여넣어 주세요.');
+    if (!apiKey && audioFile.size > MAX_AI_BYTES) {
+      setSubtitleError(
+        '4MB보다 큰 파일은 상단의 Gemini API 키를 등록하면 크기 제한 없이 추출할 수 있어요. 또는 아래에 가사를 직접 붙여넣어 주세요.',
+      );
       return;
     }
     setTranscribing(true);
     try {
-      const form = new FormData();
-      form.append('audio', audioFile);
-      const res = await fetch('/api/transcribe', { method: 'POST', body: form });
-      const json = (await res.json()) as TranscribeResult & { error?: string };
-      if (!res.ok) throw new Error(json.error || '가사 추출에 실패했습니다.');
+      let json: TranscribeResult;
+      if (apiKey) {
+        // 브라우저에서 Gemini Files API 직접 호출 — 파일 크기 제한 없음
+        json = await transcribeWithUserKey(audioFile, apiKey);
+      } else {
+        const form = new FormData();
+        form.append('audio', audioFile);
+        const res = await fetch('/api/transcribe', { method: 'POST', body: form });
+        const parsed = (await res.json()) as TranscribeResult & { error?: string };
+        if (!res.ok) throw new Error(parsed.error || '가사 추출에 실패했습니다.');
+        json = parsed;
+      }
       const normalized = normalizeLines(json.lines ?? [], duration);
       setLines(normalized);
       setMood(json.mood || '');
@@ -190,14 +227,21 @@ export default function Studio() {
     setBgError('');
     setBgGenerating(true);
     try {
-      const res = await fetch('/api/background', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scene: scenePrompt || genre.defaultScene, style: genre.imageStyle }),
-      });
-      const json = (await res.json()) as { image?: string; error?: string };
-      if (!res.ok || !json.image) throw new Error(json.error || '배경 생성에 실패했습니다.');
-      setBgImageUrl(json.image);
+      const scene = scenePrompt || genre.defaultScene;
+      let image: string;
+      if (apiKey) {
+        image = await generateBackgroundWithUserKey(scene, genre.imageStyle, apiKey);
+      } else {
+        const res = await fetch('/api/background', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scene, style: genre.imageStyle }),
+        });
+        const json = (await res.json()) as { image?: string; error?: string };
+        if (!res.ok || !json.image) throw new Error(json.error || '배경 생성에 실패했습니다.');
+        image = json.image;
+      }
+      setBgImageUrl(image);
       setBgMode('ai');
     } catch (e) {
       setBgError(e instanceof Error ? e.message : '배경 생성에 실패했습니다.');
@@ -312,6 +356,43 @@ export default function Studio() {
         </p>
       </header>
 
+      {/* API 키 설정 */}
+      <div className="mb-10 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="font-semibold">
+              🔑 Gemini API 키 {apiKeySaved
+                ? <span className="ml-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-medium text-emerald-300">등록됨 — 크기 제한 없이 AI 사용 가능</span>
+                : <span className="ml-1 text-sm font-normal text-zinc-500">(선택)</span>}
+            </h3>
+            <p className="mt-1 text-sm text-zinc-400">
+              키를 등록하면 브라우저에서 AI를 직접 호출해 <b className="text-zinc-300">파일 크기 제한 없이</b> 가사 추출·배경 생성이 가능해요.
+              키는 이 브라우저에만 저장되며, 구글 Gemini API 호출에만 사용됩니다.{' '}
+              <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="text-violet-400 underline">
+                무료 발급 (AIza…로 시작)
+              </a>
+            </p>
+          </div>
+          {apiKeySaved ? (
+            <button onClick={clearApiKey} className="btn-secondary">키 삭제</button>
+          ) : (
+            <div className="flex w-full items-center gap-2 sm:w-auto">
+              <input
+                type="password"
+                value={apiKeyInput}
+                onChange={e => setApiKeyInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && saveApiKey()}
+                placeholder="AIza…"
+                className="input w-full sm:w-64"
+              />
+              <button onClick={saveApiKey} disabled={!apiKeyInput.trim()} className="btn-primary shrink-0">
+                저장
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* STEP 1: 장르 */}
       <Section step={1} title="플레이리스트 장르 선택" sub="유튜브에서 시청 수가 가장 많은 플레이리스트 장르를 모았어요. 배경 화풍과 색감이 함께 정해집니다.">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -411,9 +492,9 @@ export default function Studio() {
               <button onClick={transcribe} disabled={transcribing} className="btn-primary">
                 {transcribing ? '가사 추출 중… (최대 1분)' : '✨ AI 가사 자동 추출'}
               </button>
-              {audioFile && audioFile.size > MAX_AI_BYTES && (
+              {!apiKey && audioFile && audioFile.size > MAX_AI_BYTES && (
                 <span className="text-xs text-amber-400">
-                  4MB 초과 파일은 AI 추출 대신 아래에 가사를 직접 붙여넣어 주세요.
+                  4MB 초과 파일은 상단에 API 키를 등록하면 제한 없이 추출할 수 있어요.
                 </span>
               )}
               {mood && <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs text-zinc-300">무드: {mood}</span>}

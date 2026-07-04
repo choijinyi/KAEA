@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
+import { buildBackgroundPrompt } from '@/lib/prompts';
 
 export const maxDuration = 60;
 export const runtime = 'nodejs';
@@ -19,15 +20,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '장면 설명이 필요합니다.' }, { status: 400 });
     }
 
-    const prompt = [
-      'A beautiful 16:9 background artwork for a YouTube music playlist video.',
-      `Scene: ${scene.trim()}`,
-      style ? `Art style: ${style}` : '',
-      'No text, no letters, no watermark, no logo. Leave the lower third visually calm so subtitles are readable.',
-    ]
-      .filter(Boolean)
-      .join('\n');
-
+    const prompt = buildBackgroundPrompt(scene, style);
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
