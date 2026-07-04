@@ -2,14 +2,22 @@
 
 @layer utilities {
   .gradient-text {
-    background: linear-gradient(to right, #93c5fd, #c7d2fe);
+    background: linear-gradient(to right, #a78bfa, #f0abfc);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
     color: transparent;
   }
-  
-  .blur-bg {
-    filter: blur(80px);
+}
+
+@layer components {
+  .input {
+    @apply rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none transition focus:border-violet-400;
+  }
+  .btn-primary {
+    @apply cursor-pointer rounded-lg bg-violet-600 px-5 py-2.5 font-medium text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-secondary {
+    @apply cursor-pointer rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50;
   }
 }

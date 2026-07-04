@@ -1,20 +1,34 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# 🎵 Playlist Studio
 
-# Run and deploy your AI Studio app
+노래 한 곡을 **유튜브 플레이리스트 영상**으로 만들어 주는 웹앱입니다.
 
-This contains everything you need to run your app locally.
+1. **장르 선택** — 유튜브에서 시청 수가 많은 인기 플레이리스트 장르(로파이·재즈·피아노·앰비언트·시티팝·팝 차트) 프리셋
+2. **음악 업로드** — MP3/M4A/WAV 등 드래그 앤 드롭
+3. **AI 자막** — Gemini가 노래를 듣고 가사를 받아써 타임스탬프 자막 생성 (직접 입력 + 탭 싱크도 지원)
+4. **AI 배경** — 스크립트와 장르에 어울리는 16:9 배경 그림 생성 (키가 없으면 무드 그라디언트 배경 사용)
+5. **영상 완성** — 브라우저에서 자막·비주얼라이저·켄 번즈 효과를 실시간 녹화해 webm 파일로 다운로드 → 유튜브에 바로 업로드
 
-View your app in AI Studio: https://ai.studio/apps/876de4cd-e732-4739-8989-e1bea6e5816f
+## 실행 방법
 
-## Run Locally
+```bash
+npm install
+npm run dev
+```
 
-**Prerequisites:**  Node.js
+`.env.local`에 Gemini API 키를 설정하면 AI 가사 추출/배경 생성이 활성화됩니다:
 
+```
+GEMINI_API_KEY=your_key_here
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Vercel 배포 시
+
+- 프로젝트 환경 변수에 `GEMINI_API_KEY`를 추가하세요.
+- 키가 없어도 앱은 동작합니다 (가사 직접 입력 + 그라디언트 배경).
+- 서버리스 요청 한도 때문에 AI 가사 추출은 4MB 이하 오디오만 지원합니다.
+
+## 기술 스택
+
+- Next.js 15 (App Router) · React 19 · Tailwind CSS 4
+- Gemini 2.5 Flash (오디오 전사) · Gemini 2.5 Flash Image (배경 생성)
+- Canvas + Web Audio + MediaRecorder (클라이언트 사이드 영상 렌더링)

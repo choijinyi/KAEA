@@ -1,5 +1,5 @@
 {
-  "name": "Remix: AI Thesis Bootcamp",
-  "description": "Landing page for AI-powered Thesis 1-Day Bootcamp",
+  "name": "Playlist Studio",
+  "description": "노래를 업로드하면 AI가 가사 자막과 배경 그림을 만들어 유튜브 플레이리스트 영상을 완성하는 웹앱",
   "requestFramePermissions": []
 }
