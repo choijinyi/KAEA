@@ -8,6 +8,8 @@ export interface SceneConfig {
   genreLabel: string;
   lines: SubtitleLine[];
   duration: number;
+  /** 곡 목록 (2곡 이상이면 현재 곡 제목을 표시) — start: 병합 타임라인 기준 시작 시각 */
+  tracks: { start: number; name: string }[];
 }
 
 export const VIDEO_W = 1280;
@@ -113,6 +115,16 @@ export function drawFrame(
   ctx.font = `400 22px ${FONT_STACK}`;
   const sub = scene.artist ? `${scene.artist} · ${scene.genreLabel}` : scene.genreLabel;
   ctx.fillText(sub, 48, 102);
+  // 현재 재생 중인 곡 (2곡 이상일 때)
+  if (scene.tracks.length > 1) {
+    let idx = 0;
+    for (let i = 0; i < scene.tracks.length; i++) {
+      if (t >= scene.tracks[i].start) idx = i;
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.font = `400 20px ${FONT_STACK}`;
+    ctx.fillText(`▶ ${idx + 1}/${scene.tracks.length} · ${scene.tracks[idx].name}`, 48, 134);
+  }
   ctx.shadowBlur = 0;
 
   // --- 비주얼라이저 ---
@@ -185,7 +197,7 @@ export interface RenderHandle {
  * (탭이 백그라운드로 가면 프레임이 멈추므로 렌더링 중 탭을 유지해야 한다)
  */
 export function renderVideo(
-  audioData: ArrayBuffer,
+  buffer: AudioBuffer,
   scene: SceneConfig,
   onProgress: (p: number, t: number) => void,
 ): RenderHandle {
@@ -201,7 +213,6 @@ export function renderVideo(
       if (!ctx) throw new Error('캔버스를 생성할 수 없습니다.');
 
       const actx = new AudioContext();
-      const buffer = await actx.decodeAudioData(audioData.slice(0));
       const src = actx.createBufferSource();
       src.buffer = buffer;
       const analyser = actx.createAnalyser();

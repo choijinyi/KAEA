@@ -11,11 +11,21 @@ import {
 } from '@/lib/types';
 import { drawFrame, renderVideo, VIDEO_H, VIDEO_W, type RenderHandle, type SceneConfig } from '@/lib/render';
 import { generateBackgroundWithUserKey, transcribeWithUserKey } from '@/lib/gemini-client';
+import { audioBufferToWav, decodeAudioFile, mergeTracks, type MergedAudio } from '@/lib/audio';
 
 const MAX_AI_BYTES = 4 * 1024 * 1024;
 const API_KEY_STORAGE = 'playlist-studio-gemini-key';
+const TRACK_GAP_SEC = 0.8;
 
 type BgMode = 'ai' | 'gradient';
+
+interface Track {
+  id: string;
+  name: string;
+  file: File;
+  buffer: AudioBuffer;
+  duration: number;
+}
 
 export default function Studio() {
   // 0. API 키 (브라우저에만 저장 — 등록 시 크기 제한 없이 브라우저에서 직접 AI 호출)
@@ -56,19 +66,22 @@ export default function Studio() {
   const [genreId, setGenreId] = useState('lofi');
   const genre = getGenre(genreId);
 
-  // 2. 오디오
-  const [audioFile, setAudioFile] = useState<File | null>(null);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [duration, setDuration] = useState(0);
+  // 2. 트랙 (여러 곡)
+  const [tracks, setTracks] = useState<Track[]>([]);
+  const [merged, setMerged] = useState<(MergedAudio & { url: string }) | null>(null);
+  const [merging, setMerging] = useState(false);
   const [title, setTitle] = useState('');
   const [artist, setArtist] = useState('');
   const [audioError, setAudioError] = useState('');
   const [dragOver, setDragOver] = useState(false);
 
+  const duration = merged?.duration ?? 0;
+
   // 3. 자막
   const [lines, setLines] = useState<SubtitleLine[]>([]);
   const [lyricsText, setLyricsText] = useState('');
   const [transcribing, setTranscribing] = useState(false);
+  const [transcribeStatus, setTranscribeStatus] = useState('');
   const [subtitleError, setSubtitleError] = useState('');
   const [mood, setMood] = useState('');
 
@@ -115,6 +128,37 @@ export default function Studio() {
     img.src = bgImageUrl;
   }, [bgImageUrl]);
 
+  // 트랙이 바뀌면 자동으로 한 곡으로 이어 붙인다
+  useEffect(() => {
+    let cancelled = false;
+    if (tracks.length === 0) {
+      setMerged(prev => {
+        if (prev) URL.revokeObjectURL(prev.url);
+        return null;
+      });
+      return;
+    }
+    setMerging(true);
+    (async () => {
+      const m = await mergeTracks(tracks.map(t => t.buffer), TRACK_GAP_SEC);
+      if (cancelled) return;
+      const url = URL.createObjectURL(audioBufferToWav(m.buffer));
+      setMerged(prev => {
+        if (prev) URL.revokeObjectURL(prev.url);
+        return { ...m, url };
+      });
+      setMerging(false);
+    })().catch(() => {
+      if (!cancelled) {
+        setMerging(false);
+        setAudioError('곡을 이어 붙이는 중 오류가 발생했습니다.');
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [tracks]);
+
   const scene: SceneConfig = useMemo(
     () => ({
       bgImage: bgMode === 'ai' ? bgImageEl : null,
@@ -124,64 +168,118 @@ export default function Studio() {
       genreLabel: genre.name,
       lines,
       duration,
+      tracks: tracks.map((t, i) => ({ start: merged?.starts[i] ?? 0, name: t.name })),
     }),
-    [bgMode, bgImageEl, genre, title, artist, lines, duration],
+    [bgMode, bgImageEl, genre, title, artist, lines, duration, tracks, merged],
   );
 
-  /* ---------- 오디오 업로드 ---------- */
-  const onFile = useCallback(async (f: File) => {
-    setAudioError('');
-    if (!f.type.startsWith('audio/') && !/\.(mp3|m4a|wav|ogg|flac|aac|webm)$/i.test(f.name)) {
-      setAudioError('오디오 파일(MP3, M4A, WAV 등)을 올려 주세요.');
-      return;
-    }
-    try {
-      const data = await f.arrayBuffer();
-      const actx = new AudioContext();
-      const buf = await actx.decodeAudioData(data.slice(0));
-      await actx.close();
-      setAudioFile(f);
-      setDuration(buf.duration);
-      setAudioUrl(prev => {
-        if (prev) URL.revokeObjectURL(prev);
-        return URL.createObjectURL(f);
-      });
-      if (!title) setTitle(f.name.replace(/\.[^.]+$/, ''));
-      setLines([]);
-      setResultUrl(null);
-    } catch {
-      setAudioError('오디오를 해석할 수 없습니다. 다른 파일로 시도해 주세요.');
-    }
-  }, [title]);
+  /* ---------- 트랙 업로드/편집 ---------- */
+  const resetTimeline = () => {
+    setLines([]);
+    setResultUrl(null);
+  };
 
-  /* ---------- AI 가사 추출 ---------- */
-  const transcribe = async () => {
-    if (!audioFile) return;
-    setSubtitleError('');
-    if (!apiKey && audioFile.size > MAX_AI_BYTES) {
-      setSubtitleError(
-        '4MB보다 큰 파일은 상단의 Gemini API 키를 등록하면 크기 제한 없이 추출할 수 있어요. 또는 아래에 가사를 직접 붙여넣어 주세요.',
+  const addFiles = useCallback(
+    async (list: FileList | File[]) => {
+      setAudioError('');
+      const files = Array.from(list).filter(
+        f => f.type.startsWith('audio/') || /\.(mp3|m4a|wav|ogg|flac|aac|webm)$/i.test(f.name),
       );
-      return;
+      if (files.length === 0) {
+        setAudioError('오디오 파일(MP3, M4A, WAV 등)을 올려 주세요.');
+        return;
+      }
+      const added: Track[] = [];
+      for (const f of files) {
+        try {
+          const buffer = await decodeAudioFile(f);
+          added.push({
+            id: crypto.randomUUID(),
+            name: f.name.replace(/\.[^.]+$/, ''),
+            file: f,
+            buffer,
+            duration: buffer.duration,
+          });
+        } catch {
+          setAudioError(`"${f.name}" 파일을 해석할 수 없어 건너뛰었습니다.`);
+        }
+      }
+      if (added.length === 0) return;
+      setTracks(prev => [...prev, ...added]);
+      setTitle(prev => prev || added[0].name);
+      resetTimeline();
+    },
+    [],
+  );
+
+  const removeTrack = (id: string) => {
+    setTracks(prev => prev.filter(t => t.id !== id));
+    resetTimeline();
+  };
+
+  const moveTrack = (id: string, dir: -1 | 1) => {
+    setTracks(prev => {
+      const i = prev.findIndex(t => t.id === id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+    resetTimeline();
+  };
+
+  /* ---------- AI 가사 추출 (곡별 추출 → 병합 타임라인에 정렬) ---------- */
+  const transcribe = async () => {
+    if (!merged || tracks.length === 0) return;
+    setSubtitleError('');
+    if (!apiKey) {
+      const over = tracks.find(t => t.file.size > MAX_AI_BYTES);
+      if (over) {
+        setSubtitleError(
+          `"${over.name}"이(가) 4MB를 넘어요. 상단에 Gemini API 키를 등록하면 크기 제한 없이 추출할 수 있어요.`,
+        );
+        return;
+      }
     }
     setTranscribing(true);
     try {
-      let json: TranscribeResult;
-      if (apiKey) {
-        // 브라우저에서 Gemini Files API 직접 호출 — 파일 크기 제한 없음
-        json = await transcribeWithUserKey(audioFile, apiKey);
-      } else {
-        const form = new FormData();
-        form.append('audio', audioFile);
-        const res = await fetch('/api/transcribe', { method: 'POST', body: form });
-        const parsed = (await res.json()) as TranscribeResult & { error?: string };
-        if (!res.ok) throw new Error(parsed.error || '가사 추출에 실패했습니다.');
-        json = parsed;
+      const all: SubtitleLine[] = [];
+      let firstMood = '';
+      let firstScene = '';
+      for (let i = 0; i < tracks.length; i++) {
+        const tr = tracks[i];
+        setTranscribeStatus(tracks.length > 1 ? `${i + 1}/${tracks.length}곡 「${tr.name}」 추출 중…` : '가사 추출 중… (최대 1분)');
+        let json: TranscribeResult;
+        if (apiKey) {
+          // 브라우저에서 Gemini Files API 직접 호출 — 파일 크기 제한 없음
+          json = await transcribeWithUserKey(tr.file, apiKey);
+        } else {
+          const form = new FormData();
+          form.append('audio', tr.file);
+          const res = await fetch('/api/transcribe', { method: 'POST', body: form });
+          const parsed = (await res.json()) as TranscribeResult & { error?: string };
+          if (!res.ok) throw new Error(parsed.error || '가사 추출에 실패했습니다.');
+          json = parsed;
+        }
+        const offset = merged.starts[i];
+        const perTrack = normalizeLines(json.lines ?? [], tr.duration);
+        all.push(
+          ...perTrack.map(l => ({
+            ...l,
+            start: +(l.start + offset).toFixed(1),
+            end: +(l.end + offset).toFixed(1),
+          })),
+        );
+        if (i === 0) {
+          firstMood = json.mood || '';
+          firstScene = json.scenePromptEn || '';
+        }
       }
-      const normalized = normalizeLines(json.lines ?? [], duration);
+      const normalized = normalizeLines(all, merged.duration);
       setLines(normalized);
-      setMood(json.mood || '');
-      if (json.scenePromptEn && !sceneTouched) setScenePrompt(json.scenePromptEn);
+      setMood(firstMood);
+      if (firstScene && !sceneTouched) setScenePrompt(firstScene);
       if (normalized.length === 0) {
         setSubtitleError('보컬(가사)을 찾지 못했습니다. 연주곡이라면 자막 없이 진행해도 좋아요.');
       }
@@ -189,6 +287,7 @@ export default function Studio() {
       setSubtitleError(e instanceof Error ? e.message : '가사 추출에 실패했습니다.');
     } finally {
       setTranscribing(false);
+      setTranscribeStatus('');
     }
   };
 
@@ -205,9 +304,9 @@ export default function Studio() {
 
   /* ---------- 탭 싱크 ---------- */
   const startSync = () => {
-    if (!audioUrl || lines.length === 0) return;
+    if (!merged || lines.length === 0) return;
     stopPreview();
-    const audio = new Audio(audioUrl);
+    const audio = new Audio(merged.url);
     syncAudioRef.current = audio;
     setSyncIndex(0);
     void audio.play();
@@ -235,15 +334,15 @@ export default function Studio() {
     setBgError('');
     setBgGenerating(true);
     try {
-      const scene = scenePrompt || genre.defaultScene;
+      const sceneText = scenePrompt || genre.defaultScene;
       let image: string;
       if (apiKey) {
-        image = await generateBackgroundWithUserKey(scene, genre.imageStyle, apiKey);
+        image = await generateBackgroundWithUserKey(sceneText, genre.imageStyle, apiKey);
       } else {
         const res = await fetch('/api/background', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ scene, style: genre.imageStyle }),
+          body: JSON.stringify({ scene: sceneText, style: genre.imageStyle }),
         });
         const json = (await res.json()) as { image?: string; error?: string };
         if (!res.ok || !json.image) throw new Error(json.error || '배경 생성에 실패했습니다.');
@@ -266,13 +365,13 @@ export default function Studio() {
   }, []);
 
   const startPreview = () => {
-    if (!audioUrl) return;
+    if (!merged) return;
     stopPreview();
     const canvas = previewCanvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
 
-    const audio = new Audio(audioUrl);
+    const audio = new Audio(merged.url);
     const actx = new AudioContext();
     const src = actx.createMediaElementSource(audio);
     const analyser = actx.createAnalyser();
@@ -319,15 +418,14 @@ export default function Studio() {
 
   /* ---------- 영상 렌더링 ---------- */
   const startRender = async () => {
-    if (!audioFile) return;
+    if (!merged) return;
     stopPreview();
     setRenderError('');
     setResultUrl(null);
     setRendering(true);
     setRenderProgress(0);
     try {
-      const data = await audioFile.arrayBuffer();
-      const handle = renderVideo(data, sceneRef.current, (p, t) => {
+      const handle = renderVideo(merged.buffer, sceneRef.current, (p, t) => {
         setRenderProgress(p);
         setRenderTime(t);
       });
@@ -347,7 +445,7 @@ export default function Studio() {
 
   const cancelRender = () => renderHandleRef.current?.cancel();
 
-  const ready = !!audioFile;
+  const ready = tracks.length > 0 && !!merged && !merging;
   const safeName = (title || 'playlist').replace(/[\\/:*?"<>|]/g, '_');
 
   /* ================= UI ================= */
@@ -357,10 +455,10 @@ export default function Studio() {
       <header className="mb-12 text-center">
         <p className="mb-3 text-sm font-medium tracking-[0.3em] text-violet-400">PLAYLIST STUDIO</p>
         <h1 className="text-3xl font-bold leading-tight sm:text-5xl">
-          노래 한 곡이 <span className="gradient-text">유튜브 플레이리스트 영상</span>이 됩니다
+          노래 여러 곡이 <span className="gradient-text">유튜브 플레이리스트 영상</span> 하나가 됩니다
         </h1>
         <p className="mt-4 text-zinc-400">
-          음악을 올리면 AI가 가사를 추출해 자막을 만들고, 곡에 어울리는 배경을 그려 영상으로 완성해요.
+          곡들을 올리면 자동으로 이어 붙이고, AI가 가사를 추출해 자막을 만들고, 어울리는 배경을 그려 영상으로 완성해요.
         </p>
       </header>
 
@@ -423,44 +521,33 @@ export default function Studio() {
         </div>
       </Section>
 
-      {/* STEP 2: 음악 업로드 */}
-      <Section step={2} title="음악 업로드" sub="MP3, M4A, WAV 등 오디오 파일을 올려 주세요.">
+      {/* STEP 2: 음악 업로드 (여러 곡) */}
+      <Section step={2} title="음악 업로드 — 여러 곡 가능" sub="곡들을 올리면 순서대로 한 곡으로 이어 붙여요. 순서를 바꾸거나 뺄 수 있습니다.">
         <div
           onDragOver={e => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onDrop={e => {
             e.preventDefault();
             setDragOver(false);
-            const f = e.dataTransfer.files[0];
-            if (f) void onFile(f);
+            if (e.dataTransfer.files.length) void addFiles(e.dataTransfer.files);
           }}
-          className={`rounded-xl border-2 border-dashed p-8 text-center transition ${
+          className={`rounded-xl border-2 border-dashed p-6 text-center transition ${
             dragOver ? 'border-violet-400 bg-violet-500/10' : 'border-zinc-700 bg-zinc-900/40'
           }`}
         >
-          {audioFile ? (
-            <div>
-              <div className="text-lg font-semibold">🎵 {audioFile.name}</div>
-              <div className="mt-1 text-sm text-zinc-400">
-                {formatTime(duration)} · {(audioFile.size / 1024 / 1024).toFixed(1)}MB
-              </div>
-              {audioUrl && <audio controls src={audioUrl} className="mx-auto mt-4 w-full max-w-md" />}
-            </div>
-          ) : (
-            <div className="text-zinc-400">
-              <div className="text-4xl">🎧</div>
-              <p className="mt-3">파일을 끌어다 놓거나 아래 버튼으로 선택하세요</p>
-            </div>
-          )}
-          <label className="mt-5 inline-block cursor-pointer rounded-lg bg-violet-600 px-5 py-2.5 font-medium text-white transition hover:bg-violet-500">
-            {audioFile ? '다른 파일 선택' : '오디오 파일 선택'}
+          <div className="text-zinc-400">
+            <div className="text-4xl">🎧</div>
+            <p className="mt-3">여러 파일을 한꺼번에 끌어다 놓거나 버튼으로 선택하세요</p>
+          </div>
+          <label className="mt-4 inline-block cursor-pointer rounded-lg bg-violet-600 px-5 py-2.5 font-medium text-white transition hover:bg-violet-500">
+            {tracks.length > 0 ? '곡 추가' : '오디오 파일 선택'}
             <input
               type="file"
+              multiple
               accept="audio/*,.mp3,.m4a,.wav,.ogg,.flac,.aac"
               className="hidden"
               onChange={e => {
-                const f = e.target.files?.[0];
-                if (f) void onFile(f);
+                if (e.target.files?.length) void addFiles(e.target.files);
                 e.target.value = '';
               }}
             />
@@ -468,13 +555,48 @@ export default function Studio() {
           {audioError && <p className="mt-3 text-sm text-red-400">{audioError}</p>}
         </div>
 
+        {tracks.length > 0 && (
+          <div className="mt-4 space-y-1.5">
+            {tracks.map((t, i) => (
+              <div key={t.id} className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/40 p-2.5">
+                <span className="w-6 text-center text-sm font-semibold text-violet-300">{i + 1}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">{t.name}</div>
+                  <div className="text-xs text-zinc-500">
+                    {formatTime(t.duration)} · {(t.file.size / 1024 / 1024).toFixed(1)}MB
+                  </div>
+                </div>
+                <button onClick={() => moveTrack(t.id, -1)} disabled={i === 0} className="btn-icon" title="위로">↑</button>
+                <button onClick={() => moveTrack(t.id, 1)} disabled={i === tracks.length - 1} className="btn-icon" title="아래로">↓</button>
+                <button onClick={() => removeTrack(t.id)} className="btn-icon hover:text-red-400" title="삭제">✕</button>
+              </div>
+            ))}
+
+            <div className="rounded-lg border border-violet-800/40 bg-violet-500/5 p-3 text-sm">
+              {merging ? (
+                <span className="text-violet-300">🔗 곡을 한 곡으로 이어 붙이는 중…</span>
+              ) : merged ? (
+                <div>
+                  <span className="font-medium text-violet-200">
+                    ✅ {tracks.length}곡을 한 곡으로 이어 붙였어요 — 총 {formatTime(merged.duration)}
+                  </span>
+                  {tracks.length > 1 && (
+                    <span className="ml-2 text-xs text-zinc-500">(곡 사이 {TRACK_GAP_SEC}초 간격)</span>
+                  )}
+                  <audio controls src={merged.url} className="mt-3 w-full max-w-xl" />
+                </div>
+              ) : null}
+            </div>
+          </div>
+        )}
+
         {ready && (
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <Field label="영상 제목">
               <input
                 value={title}
                 onChange={e => setTitle(e.target.value)}
-                className="input"
+                className="input w-full"
                 placeholder="예: 비 오는 밤, 재즈 한 잔"
               />
             </Field>
@@ -482,7 +604,7 @@ export default function Studio() {
               <input
                 value={artist}
                 onChange={e => setArtist(e.target.value)}
-                className="input"
+                className="input w-full"
                 placeholder="예: KAEA"
               />
             </Field>
@@ -491,18 +613,18 @@ export default function Studio() {
       </Section>
 
       {/* STEP 3: 자막 */}
-      <Section step={3} title="스크립트 · 자막" sub="AI가 노래에서 가사를 받아써 타임스탬프 자막을 만들어요. 연주곡이라면 건너뛰어도 됩니다.">
+      <Section step={3} title="스크립트 · 자막" sub="AI가 곡마다 가사를 받아써 전체 타임라인에 맞는 자막을 만들어요. 연주곡이라면 건너뛰어도 됩니다.">
         {!ready ? (
           <Placeholder>먼저 음악을 업로드해 주세요.</Placeholder>
         ) : (
           <>
             <div className="flex flex-wrap items-center gap-3">
               <button onClick={transcribe} disabled={transcribing} className="btn-primary">
-                {transcribing ? '가사 추출 중… (최대 1분)' : '✨ AI 가사 자동 추출'}
+                {transcribing ? transcribeStatus || '가사 추출 중…' : `✨ AI 가사 자동 추출${tracks.length > 1 ? ` (${tracks.length}곡 전체)` : ''}`}
               </button>
-              {!apiKey && audioFile && audioFile.size > MAX_AI_BYTES && (
+              {!apiKey && tracks.some(t => t.file.size > MAX_AI_BYTES) && (
                 <span className="text-xs text-amber-400">
-                  4MB 초과 파일은 상단에 API 키를 등록하면 제한 없이 추출할 수 있어요.
+                  4MB 초과 곡이 있어요 — 상단에 API 키를 등록하면 제한 없이 추출할 수 있어요.
                 </span>
               )}
               {mood && <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs text-zinc-300">무드: {mood}</span>}
@@ -511,7 +633,7 @@ export default function Studio() {
 
             <details className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
               <summary className="cursor-pointer text-sm font-medium text-zinc-300">
-                ✍️ 가사 직접 붙여넣기 (한 줄 = 자막 한 줄)
+                ✍️ 가사 직접 붙여넣기 (한 줄 = 자막 한 줄, 전체 곡 길이에 균등 배치)
               </summary>
               <textarea
                 value={lyricsText}
@@ -636,7 +758,7 @@ export default function Studio() {
       </Section>
 
       {/* STEP 5: 렌더링 */}
-      <Section step={5} title="영상 완성" sub="곡 전체를 실시간으로 녹화해 webm 영상 파일로 만듭니다. 곡 길이만큼 시간이 걸려요.">
+      <Section step={5} title="영상 완성" sub="이어 붙인 전체 플레이리스트를 실시간으로 녹화해 webm 영상 파일로 만듭니다. 전체 길이만큼 시간이 걸려요.">
         {!ready ? (
           <Placeholder>먼저 음악을 업로드해 주세요.</Placeholder>
         ) : rendering ? (
@@ -656,7 +778,7 @@ export default function Studio() {
         ) : (
           <div>
             <button onClick={startRender} className="btn-primary text-lg">
-              🎬 영상 만들기 ({formatTime(duration)} 소요)
+              🎬 영상 만들기 ({tracks.length}곡 · {formatTime(duration)} 소요)
             </button>
             {renderError && <p className="mt-3 text-sm text-red-400">{renderError}</p>}
 
@@ -675,8 +797,16 @@ export default function Studio() {
                   <p className="font-medium text-zinc-300">유튜브 업로드 팁</p>
                   <p>· webm은 유튜브에 바로 업로드할 수 있어요 (YouTube Studio → 만들기 → 동영상 업로드).</p>
                   <p>· 제목에 “{genre.name.split(' ')[0]} playlist”, “{mood || '감성'} 플레이리스트” 같은 검색 키워드를 넣어 보세요.</p>
-                  <p>· 여러 곡을 만들었다면 유튜브 재생목록으로 묶으면 시청 시간이 길어집니다.</p>
+                  <p>· 설명란에 곡 시작 시각(타임스탬프)을 적으면 유튜브가 자동으로 챕터를 만들어 줍니다.</p>
                 </div>
+                {tracks.length > 1 && merged && (
+                  <div className="mt-3 rounded-lg bg-zinc-900/60 p-3 font-mono text-xs text-zinc-300">
+                    <p className="mb-1 font-sans font-medium text-zinc-400">📋 유튜브 설명란용 트랙리스트 (복사해서 붙여넣기)</p>
+                    {tracks.map((t, i) => (
+                      <div key={t.id}>{formatTime(merged.starts[i])} {t.name}</div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
