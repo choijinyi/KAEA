@@ -9,16 +9,32 @@ const SUPABASE_KEY =
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-export const BOARD_SIZE = 5;
-export const TOTAL_NAMES = BOARD_SIZE * BOARD_SIZE;
+/** 참가자가 적는 이름 수 */
+export const TOTAL_NAMES = 25;
+/** 정답 점수 구간과 구간별 정답 수: 100/200/300/500점 x 3개 = 총 12개 */
+export const TIERS = [100, 200, 300, 500] as const;
+export const ANSWERS_PER_TIER = 3;
+export const TOTAL_ANSWERS = TIERS.length * ANSWERS_PER_TIER;
+
+export interface Answer {
+  name: string;
+  points: number;
+}
 
 export interface BingoGame {
   code: string;
   title: string;
-  names: string[];
-  called: string[];
+  answers: Answer[];
   created_at: string;
   updated_at: string;
+}
+
+export interface BingoPlayer {
+  id: string;
+  game_code: string;
+  nickname: string;
+  names: string[];
+  created_at: string;
 }
 
 /** 헷갈리는 글자(0/O, 1/I)를 뺀 6자리 게임 코드 생성 */
@@ -31,67 +47,61 @@ export function generateGameCode(): string {
   return code;
 }
 
-/** 줄바꿈·쉼표로 구분된 입력에서 이름 목록 추출 (공백 제거, 중복 제거) */
+/** 이름 비교용 정규화: 공백 제거 + 소문자화 */
+export function normalizeName(name: string): string {
+  return name.replace(/\s+/g, '').toLowerCase();
+}
+
+/** 줄바꿈·쉼표로 구분된 입력에서 이름 목록 추출 (공백 제거, 정규화 기준 중복 제거) */
 export function parseNames(raw: string): string[] {
   const seen = new Set<string>();
   const names: string[] = [];
   for (const part of raw.split(/[\n,]+/)) {
     const name = part.trim();
-    if (name && !seen.has(name)) {
-      seen.add(name);
+    const key = normalizeName(name);
+    if (name && !seen.has(key)) {
+      seen.add(key);
       names.push(name);
     }
   }
   return names;
 }
 
-export function shuffle<T>(arr: T[]): T[] {
-  const out = [...arr];
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]];
-  }
-  return out;
+/** 참가자 이름 목록과 공개된 정답으로 (맞춘 정답, 총점) 계산 */
+export function scorePlayer(names: string[], answers: Answer[]) {
+  const mine = new Set(names.map(normalizeName));
+  const matched = answers.filter(a => mine.has(normalizeName(a.name)));
+  return {
+    matched,
+    score: matched.reduce((sum, a) => sum + a.points, 0),
+  };
 }
 
-/** 가능한 빙고 줄(가로 5, 세로 5, 대각선 2)의 칸 인덱스 목록 */
-export const BINGO_LINES: number[][] = (() => {
-  const lines: number[][] = [];
-  for (let r = 0; r < BOARD_SIZE; r++) {
-    lines.push(Array.from({length: BOARD_SIZE}, (_, c) => r * BOARD_SIZE + c));
-  }
-  for (let c = 0; c < BOARD_SIZE; c++) {
-    lines.push(Array.from({length: BOARD_SIZE}, (_, r) => r * BOARD_SIZE + c));
-  }
-  lines.push(Array.from({length: BOARD_SIZE}, (_, i) => i * BOARD_SIZE + i));
-  lines.push(Array.from({length: BOARD_SIZE}, (_, i) => i * BOARD_SIZE + (BOARD_SIZE - 1 - i)));
-  return lines;
-})();
-
-/** 완성된 빙고 줄들을 반환 */
-export function completedLines(board: string[], called: Set<string>): number[][] {
-  return BINGO_LINES.filter(line => line.every(i => called.has(board[i])));
+/** 이름이 공개된 정답과 일치하면 해당 정답 반환 */
+export function matchAnswer(name: string, answers: Answer[]): Answer | undefined {
+  const key = normalizeName(name);
+  return answers.find(a => normalizeName(a.name) === key);
 }
 
 export async function fetchGame(code: string): Promise<BingoGame | null> {
   const {data, error} = await supabase
     .from('bingo_games')
-    .select('*')
+    .select('code, title, answers, created_at, updated_at')
     .eq('code', code.toUpperCase())
     .maybeSingle();
   if (error) throw new Error(error.message);
   return (data as BingoGame | null) ?? null;
 }
 
-export async function createGame(title: string, names: string[]): Promise<BingoGame> {
+export async function createGame(title: string): Promise<BingoGame> {
   // 코드 충돌 시 몇 번 재시도
   let lastError = '';
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = generateGameCode();
     const {data, error} = await supabase
       .from('bingo_games')
-      .insert({code, title, names, called: []})
-      .select()
+      .insert({code, title, names: [], called: [], answers: []})
+      .select('code, title, answers, created_at, updated_at')
       .single();
     if (!error) return data as BingoGame;
     lastError = error.message;
@@ -100,21 +110,45 @@ export async function createGame(title: string, names: string[]): Promise<BingoG
   throw new Error(`게임 생성에 실패했습니다: ${lastError}`);
 }
 
-export async function updateCalled(code: string, called: string[]): Promise<void> {
+export async function updateAnswers(code: string, answers: Answer[]): Promise<void> {
   const {error} = await supabase
     .from('bingo_games')
-    .update({called, updated_at: new Date().toISOString()})
+    .update({answers, updated_at: new Date().toISOString()})
     .eq('code', code);
   if (error) throw new Error(error.message);
 }
 
-/** 게임 변경(진행자가 이름을 지움)을 실시간 구독. 해제 함수 반환 */
+export async function joinGame(
+  code: string,
+  nickname: string,
+  names: string[],
+): Promise<BingoPlayer> {
+  const {data, error} = await supabase
+    .from('bingo_players')
+    .insert({game_code: code, nickname, names})
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data as BingoPlayer;
+}
+
+export async function fetchPlayers(code: string): Promise<BingoPlayer[]> {
+  const {data, error} = await supabase
+    .from('bingo_players')
+    .select('*')
+    .eq('game_code', code)
+    .order('created_at');
+  if (error) throw new Error(error.message);
+  return (data as BingoPlayer[]) ?? [];
+}
+
+/** 게임 변경(진행자가 정답을 적음)을 실시간 구독. 해제 함수 반환 */
 export function subscribeToGame(
   code: string,
   onChange: (game: BingoGame) => void,
 ): () => void {
   const channel = supabase
-    .channel(`bingo:${code}`)
+    .channel(`bingo-game:${code}`)
     .on(
       'postgres_changes',
       {event: 'UPDATE', schema: 'public', table: 'bingo_games', filter: `code=eq.${code}`},
@@ -131,6 +165,37 @@ export function subscribeToGame(
       // 일시적 네트워크 오류는 다음 폴링에서 복구
     }
   }, 5000);
+
+  return () => {
+    clearInterval(poll);
+    supabase.removeChannel(channel);
+  };
+}
+
+/** 참가자 입장/변경을 실시간 구독 (진행자 순위표용). 해제 함수 반환 */
+export function subscribeToPlayers(
+  code: string,
+  onChange: (players: BingoPlayer[]) => void,
+): () => void {
+  const refetch = async () => {
+    try {
+      onChange(await fetchPlayers(code));
+    } catch {
+      // 일시적 네트워크 오류는 다음 이벤트/폴링에서 복구
+    }
+  };
+
+  const channel = supabase
+    .channel(`bingo-players:${code}`)
+    .on(
+      'postgres_changes',
+      {event: '*', schema: 'public', table: 'bingo_players', filter: `game_code=eq.${code}`},
+      refetch,
+    )
+    .subscribe();
+
+  const poll = setInterval(refetch, 7000);
+  refetch();
 
   return () => {
     clearInterval(poll);

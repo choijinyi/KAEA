@@ -1,17 +1,30 @@
 'use client';
 
 import Link from 'next/link';
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 import {
+  ANSWERS_PER_TIER,
+  Answer,
   BingoGame,
-  TOTAL_NAMES,
+  BingoPlayer,
+  TIERS,
+  TOTAL_ANSWERS,
   createGame,
   fetchGame,
-  parseNames,
-  updateCalled,
+  normalizeName,
+  scorePlayer,
+  subscribeToPlayers,
+  updateAnswers,
 } from '@/lib/bingo';
 
 const LAST_HOST_KEY = 'bingo-last-host-code';
+
+const TIER_STYLE: Record<number, string> = {
+  100: 'border-sky-500/40 bg-sky-600/15 text-sky-200',
+  200: 'border-emerald-500/40 bg-emerald-600/15 text-emerald-200',
+  300: 'border-amber-500/40 bg-amber-600/15 text-amber-200',
+  500: 'border-rose-500/40 bg-rose-600/15 text-rose-200',
+};
 
 export default function BingoHost({resumeCode}: {resumeCode?: string}) {
   const [game, setGame] = useState<BingoGame | null>(null);
@@ -55,7 +68,7 @@ export default function BingoHost({resumeCode}: {resumeCode?: string}) {
 
 function Shell({children}: {children: React.ReactNode}) {
   return (
-    <main className="mx-auto min-h-screen max-w-3xl px-4 py-8 sm:px-6">
+    <main className="mx-auto min-h-screen max-w-4xl px-4 py-8 sm:px-6">
       <header className="mb-6 flex items-center justify-between">
         <Link href="/bingo" className="text-sm text-zinc-400 transition hover:text-zinc-200">
           ← 이름 빙고
@@ -77,18 +90,14 @@ function SetupPanel({
   onCreated: (game: BingoGame) => void;
 }) {
   const [title, setTitle] = useState('');
-  const [raw, setRaw] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-
-  const names = useMemo(() => parseNames(raw), [raw]);
-  const ready = names.length === TOTAL_NAMES;
 
   const handleCreate = async () => {
     setBusy(true);
     setError('');
     try {
-      const game = await createGame(title.trim() || '이름 빙고', names);
+      const game = await createGame(title.trim() || '이름 빙고');
       localStorage.setItem(LAST_HOST_KEY, game.code);
       onCreated(game);
     } catch (e) {
@@ -99,11 +108,13 @@ function SetupPanel({
   };
 
   return (
-    <section className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold">새 게임 만들기</h1>
-        <p className="mt-1 text-sm text-zinc-400">
-          이름 {TOTAL_NAMES}개를 등록하면 참가자용 게임 코드가 만들어집니다.
+    <section className="mx-auto max-w-md space-y-5 pt-8">
+      <div className="text-center">
+        <p className="text-4xl">🎤</p>
+        <h1 className="mt-3 text-2xl font-bold">새 게임 만들기</h1>
+        <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+          게임을 만들면 참가자용 코드가 발급됩니다. 참가자들이 이름 25개를 적는 동안
+          진행자는 정답 보드에 100·200·300·500점짜리 이름을 3개씩 적어 공개합니다.
         </p>
       </div>
 
@@ -120,50 +131,17 @@ function SetupPanel({
         <span className="mb-1 block text-sm text-zinc-300">게임 이름 (선택)</span>
         <input
           className="input w-full"
-          placeholder="예) 3학년 2반 이름 빙고"
+          placeholder="예) 우리 반 이름 맞히기 빙고"
           value={title}
           onChange={e => setTitle(e.target.value)}
           maxLength={40}
         />
       </label>
 
-      <label className="block">
-        <span className="mb-1 flex items-baseline justify-between text-sm text-zinc-300">
-          <span>이름 목록 (줄바꿈 또는 쉼표로 구분)</span>
-          <span className={ready ? 'font-semibold text-emerald-400' : 'text-zinc-500'}>
-            {names.length} / {TOTAL_NAMES}명
-          </span>
-        </span>
-        <textarea
-          className="input h-56 w-full resize-y font-mono text-sm"
-          placeholder={'김철수\n이영희\n박민수\n…'}
-          value={raw}
-          onChange={e => setRaw(e.target.value)}
-        />
-      </label>
-
-      {names.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {names.map(name => (
-            <span
-              key={name}
-              className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-xs text-zinc-300"
-            >
-              {name}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {names.length > TOTAL_NAMES && (
-        <p className="text-sm text-amber-400">
-          이름이 {names.length - TOTAL_NAMES}개 많습니다. {TOTAL_NAMES}개만 남겨주세요.
-        </p>
-      )}
       {error && <p className="text-sm text-red-400">{error}</p>}
 
-      <button className="btn-primary w-full py-3 text-base" disabled={!ready || busy} onClick={handleCreate}>
-        {busy ? '만드는 중…' : ready ? '게임 만들기 🎲' : `이름 ${TOTAL_NAMES}개를 입력하세요`}
+      <button className="btn-primary w-full py-3 text-base" disabled={busy} onClick={handleCreate}>
+        {busy ? '만드는 중…' : '게임 만들기 🎲'}
       </button>
     </section>
   );
@@ -176,11 +154,13 @@ function HostGamePanel({
   game: BingoGame;
   onGameChange: (game: BingoGame) => void;
 }) {
+  const [players, setPlayers] = useState<BingoPlayer[]>([]);
   const [copied, setCopied] = useState<'link' | 'code' | null>(null);
   const [syncError, setSyncError] = useState('');
-  const calledSet = useMemo(() => new Set(game.called), [game.called]);
   // 연타 시 마지막 상태만 저장되도록 요청 순서를 직렬화
   const pending = useRef(Promise.resolve());
+
+  useEffect(() => subscribeToPlayers(game.code, setPlayers), [game.code]);
 
   const joinUrl =
     typeof window === 'undefined'
@@ -197,20 +177,39 @@ function HostGamePanel({
     }
   };
 
-  const toggleName = useCallback(
-    (name: string) => {
-      const called = calledSet.has(name)
-        ? game.called.filter(n => n !== name)
-        : [...game.called, name];
-      onGameChange({...game, called});
-      setSyncError('');
-      pending.current = pending.current.then(() =>
-        updateCalled(game.code, called).catch(() =>
-          setSyncError('저장에 실패했어요. 네트워크를 확인하고 다시 눌러주세요.'),
-        ),
-      );
-    },
-    [game, calledSet, onGameChange],
+  const saveAnswers = (answers: Answer[]) => {
+    onGameChange({...game, answers});
+    setSyncError('');
+    pending.current = pending.current.then(() =>
+      updateAnswers(game.code, answers).catch(() =>
+        setSyncError('저장에 실패했어요. 네트워크를 확인하고 다시 시도해주세요.'),
+      ),
+    );
+  };
+
+  const addAnswer = (points: number, name: string) => {
+    const clean = name.trim();
+    if (!clean) return '이름을 입력하세요.';
+    if (game.answers.some(a => normalizeName(a.name) === normalizeName(clean))) {
+      return '이미 적은 정답입니다.';
+    }
+    if (game.answers.filter(a => a.points === points).length >= ANSWERS_PER_TIER) {
+      return `${points}점 정답은 ${ANSWERS_PER_TIER}개까지만 적을 수 있어요.`;
+    }
+    saveAnswers([...game.answers, {name: clean, points}]);
+    return '';
+  };
+
+  const removeAnswer = (answer: Answer) => {
+    saveAnswers(game.answers.filter(a => a !== answer));
+  };
+
+  const ranking = useMemo(
+    () =>
+      players
+        .map(p => ({player: p, ...scorePlayer(p.names, game.answers)}))
+        .sort((a, b) => b.score - a.score || a.player.created_at.localeCompare(b.player.created_at)),
+    [players, game.answers],
   );
 
   return (
@@ -234,54 +233,141 @@ function HostGamePanel({
         <p className="mt-3 break-all text-xs text-zinc-500">{joinUrl}</p>
       </div>
 
-      <div>
-        <div className="mb-3 flex items-baseline justify-between">
-          <h2 className="font-semibold">
-            이름을 눌러 지우세요{' '}
-            <span className="text-sm font-normal text-zinc-400">
-              (다시 누르면 복구)
+      <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
+        <div>
+          <div className="mb-3 flex items-baseline justify-between">
+            <h2 className="font-semibold">📝 정답 보드</h2>
+            <span className="text-sm text-zinc-400">
+              <b className="text-violet-300">{game.answers.length}</b> / {TOTAL_ANSWERS} 공개
             </span>
-          </h2>
-          <span className="text-sm text-zinc-400">
-            <b className="text-violet-300">{game.called.length}</b> / {game.names.length} 지움
-          </span>
+          </div>
+          <p className="mb-3 text-sm text-zinc-400">
+            정답을 적는 순간 참가자 화면에서 해당 이름에 줄이 그어지고 점수가 올라갑니다.
+          </p>
+          {syncError && <p className="mb-2 text-sm text-red-400">{syncError}</p>}
+          <div className="space-y-3">
+            {TIERS.map(points => (
+              <TierRow
+                key={points}
+                points={points}
+                answers={game.answers.filter(a => a.points === points)}
+                onAdd={name => addAnswer(points, name)}
+                onRemove={removeAnswer}
+              />
+            ))}
+          </div>
         </div>
-        {syncError && <p className="mb-2 text-sm text-red-400">{syncError}</p>}
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-          {game.names.map(name => {
-            const called = calledSet.has(name);
-            return (
-              <button
-                key={name}
-                onClick={() => toggleName(name)}
-                className={`min-h-16 cursor-pointer rounded-xl border p-2 text-sm font-medium break-keep transition ${
-                  called
-                    ? 'border-zinc-800 bg-zinc-900/40 text-zinc-600 line-through'
-                    : 'border-zinc-700 bg-zinc-800 text-zinc-100 hover:border-violet-400 hover:bg-zinc-700'
-                }`}
-              >
-                {name}
-              </button>
-            );
-          })}
+
+        <div>
+          <div className="mb-3 flex items-baseline justify-between">
+            <h2 className="font-semibold">🏆 실시간 순위</h2>
+            <span className="text-sm text-zinc-400">참가자 {players.length}명</span>
+          </div>
+          {ranking.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-zinc-700 p-6 text-center text-sm text-zinc-500">
+              아직 참가자가 없어요.
+              <br />
+              코드나 링크를 공유해주세요!
+            </p>
+          ) : (
+            <ol className="space-y-1.5">
+              {ranking.map(({player, matched, score}, i) => (
+                <li
+                  key={player.id}
+                  className={`flex items-center gap-3 rounded-lg border p-2.5 ${
+                    i === 0 && score > 0
+                      ? 'border-amber-400/50 bg-amber-500/10'
+                      : 'border-zinc-800 bg-zinc-900/60'
+                  }`}
+                >
+                  <span className="w-7 text-center text-sm font-bold text-zinc-400">
+                    {i === 0 && score > 0 ? '👑' : i + 1}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate font-medium">{player.nickname}</span>
+                  <span className="text-xs text-zinc-500">{matched.length}개 적중</span>
+                  <span className="w-16 text-right font-bold text-violet-300">{score}점</span>
+                </li>
+              ))}
+            </ol>
+          )}
         </div>
       </div>
-
-      {game.called.length > 0 && (
-        <div>
-          <h2 className="mb-2 font-semibold">지운 순서</h2>
-          <ol className="flex flex-wrap gap-1.5">
-            {game.called.map((name, i) => (
-              <li
-                key={name}
-                className="rounded-md border border-violet-500/30 bg-violet-600/10 px-2 py-0.5 text-xs text-violet-200"
-              >
-                {i + 1}. {name}
-              </li>
-            ))}
-          </ol>
-        </div>
-      )}
     </section>
+  );
+}
+
+function TierRow({
+  points,
+  answers,
+  onAdd,
+  onRemove,
+}: {
+  points: number;
+  answers: Answer[];
+  onAdd: (name: string) => string;
+  onRemove: (answer: Answer) => void;
+}) {
+  const [name, setName] = useState('');
+  const [error, setError] = useState('');
+  const full = answers.length >= ANSWERS_PER_TIER;
+
+  const submit = () => {
+    const message = onAdd(name);
+    setError(message);
+    if (!message) setName('');
+  };
+
+  return (
+    <div className={`rounded-xl border p-3 ${TIER_STYLE[points]}`}>
+      <div className="flex items-center gap-2">
+        <span className="w-14 shrink-0 text-lg font-black">{points}점</span>
+        <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
+          {answers.map(a => (
+            <span
+              key={a.name}
+              className="inline-flex items-center gap-1 rounded-md bg-zinc-950/60 px-2 py-1 text-sm font-medium text-zinc-100"
+            >
+              {a.name}
+              <button
+                onClick={() => onRemove(a)}
+                className="cursor-pointer text-zinc-500 transition hover:text-red-400"
+                title="정답 취소"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          {Array.from({length: ANSWERS_PER_TIER - answers.length}, (_, i) => (
+            <span
+              key={i}
+              className="rounded-md border border-dashed border-zinc-600/60 px-2 py-1 text-sm text-zinc-600"
+            >
+              빈칸
+            </span>
+          ))}
+        </div>
+      </div>
+      {!full && (
+        <form
+          className="mt-2 flex gap-2"
+          onSubmit={e => {
+            e.preventDefault();
+            submit();
+          }}
+        >
+          <input
+            className="input min-w-0 flex-1 py-1.5 text-sm"
+            placeholder={`${points}점 이름 입력…`}
+            value={name}
+            onChange={e => setName(e.target.value)}
+            maxLength={30}
+          />
+          <button className="btn-secondary shrink-0" type="submit" disabled={!name.trim()}>
+            정답 적기
+          </button>
+        </form>
+      )}
+      {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
+    </div>
   );
 }
