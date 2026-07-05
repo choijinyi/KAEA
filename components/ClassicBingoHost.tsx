@@ -36,13 +36,13 @@ export default function ClassicBingoHost({resumeCode}: {resumeCode?: string}) {
   }, [resumeCode]);
 
   if (loading) {
-    return <Shell><p className="py-24 text-center text-zinc-400">게임을 불러오는 중…</p></Shell>;
+    return <Shell><p className="py-24 text-center text-zinc-500">게임을 불러오는 중…</p></Shell>;
   }
 
   return (
     <Shell>
       {error && (
-        <p className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
+        <p className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-600">
           {error}
         </p>
       )}
@@ -59,10 +59,10 @@ function Shell({children}: {children: React.ReactNode}) {
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-4 py-8 sm:px-6">
       <header className="mb-6 flex items-center justify-between">
-        <Link href="/bingo" className="text-sm text-zinc-400 transition hover:text-zinc-200">
+        <Link href="/bingo" className="text-sm text-zinc-500 transition hover:text-zinc-900">
           ← 이름 빙고
         </Link>
-        <span className="rounded-full border border-violet-500/40 bg-violet-600/20 px-3 py-1 text-xs font-medium text-violet-300">
+        <span className="rounded-full border border-violet-300 bg-violet-100 px-3 py-1 text-xs font-medium text-violet-600">
           🎤 진행자 · 클래식
         </span>
       </header>
@@ -104,7 +104,7 @@ function SetupPanel({
     <section className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold">새 클래식 빙고 만들기</h1>
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-1 text-sm text-zinc-500">
           이름 {TOTAL_NAMES}개를 등록하면 참가자들이 이 이름들로 자신만의 5×5 빙고판을 만듭니다.
         </p>
       </div>
@@ -112,14 +112,14 @@ function SetupPanel({
       {lastCode && (
         <Link
           href={`/bingo/classic/host?code=${lastCode}`}
-          className="block rounded-lg border border-zinc-700 bg-zinc-900 p-3 text-sm text-zinc-300 transition hover:bg-zinc-800"
+          className="block rounded-lg border border-zinc-300 bg-white p-3 text-sm text-zinc-600 transition hover:bg-zinc-100"
         >
-          ▶️ 최근 게임 이어서 진행하기 — 코드 <b className="text-violet-300">{lastCode}</b>
+          ▶️ 최근 게임 이어서 진행하기 — 코드 <b className="text-violet-600">{lastCode}</b>
         </Link>
       )}
 
       <label className="block">
-        <span className="mb-1 block text-sm text-zinc-300">게임 이름 (선택)</span>
+        <span className="mb-1 block text-sm text-zinc-600">게임 이름 (선택)</span>
         <input
           className="input w-full"
           placeholder="예) 3학년 2반 이름 빙고"
@@ -130,9 +130,9 @@ function SetupPanel({
       </label>
 
       <label className="block">
-        <span className="mb-1 flex items-baseline justify-between text-sm text-zinc-300">
+        <span className="mb-1 flex items-baseline justify-between text-sm text-zinc-600">
           <span>이름 목록 (줄바꿈 또는 쉼표로 구분)</span>
-          <span className={ready ? 'font-semibold text-emerald-400' : 'text-zinc-500'}>
+          <span className={ready ? 'font-semibold text-emerald-600' : 'text-zinc-500'}>
             {names.length} / {TOTAL_NAMES}명
           </span>
         </span>
@@ -149,7 +149,7 @@ function SetupPanel({
           {names.map(name => (
             <span
               key={name}
-              className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-xs text-zinc-300"
+              className="rounded-md border border-zinc-300 bg-white px-2 py-0.5 text-xs text-zinc-600"
             >
               {name}
             </span>
@@ -158,11 +158,11 @@ function SetupPanel({
       )}
 
       {names.length > TOTAL_NAMES && (
-        <p className="text-sm text-amber-400">
+        <p className="text-sm text-amber-600">
           이름이 {names.length - TOTAL_NAMES}개 많습니다. {TOTAL_NAMES}개만 남겨주세요.
         </p>
       )}
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
       <button className="btn-primary w-full py-3 text-base" disabled={!ready || busy} onClick={handleCreate}>
         {busy ? '만드는 중…' : ready ? '게임 만들기 🎲' : `이름 ${TOTAL_NAMES}개를 입력하세요`}
@@ -217,12 +217,12 @@ function HostGamePanel({
 
   return (
     <section className="space-y-6">
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+      <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-lg shadow-violet-100">
         <h1 className="text-xl font-bold">{game.title}</h1>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <div>
             <p className="text-xs text-zinc-500">게임 코드</p>
-            <p className="text-3xl font-bold tracking-[0.2em] text-violet-300">{game.code}</p>
+            <p className="text-3xl font-bold tracking-[0.2em] text-violet-600">{game.code}</p>
           </div>
           <div className="ml-auto flex gap-2">
             <button className="btn-secondary" onClick={() => copy(game.code, 'code')}>
@@ -240,15 +240,15 @@ function HostGamePanel({
         <div className="mb-3 flex items-baseline justify-between">
           <h2 className="font-semibold">
             이름을 눌러 지우세요{' '}
-            <span className="text-sm font-normal text-zinc-400">
+            <span className="text-sm font-normal text-zinc-500">
               (다시 누르면 복구)
             </span>
           </h2>
-          <span className="text-sm text-zinc-400">
-            <b className="text-violet-300">{game.called.length}</b> / {game.names.length} 지움
+          <span className="text-sm text-zinc-500">
+            <b className="text-violet-600">{game.called.length}</b> / {game.names.length} 지움
           </span>
         </div>
-        {syncError && <p className="mb-2 text-sm text-red-400">{syncError}</p>}
+        {syncError && <p className="mb-2 text-sm text-red-600">{syncError}</p>}
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
           {game.names.map(name => {
             const called = calledSet.has(name);
@@ -258,8 +258,8 @@ function HostGamePanel({
                 onClick={() => toggleName(name)}
                 className={`min-h-16 cursor-pointer rounded-xl border p-2 text-sm font-medium break-keep transition ${
                   called
-                    ? 'border-zinc-800 bg-zinc-900/40 text-zinc-600 line-through'
-                    : 'border-zinc-700 bg-zinc-800 text-zinc-100 hover:border-violet-400 hover:bg-zinc-700'
+                    ? 'border-zinc-200 bg-zinc-100/70 text-zinc-400 line-through'
+                    : 'border-zinc-300 bg-zinc-50 text-zinc-900 hover:border-violet-400 hover:bg-violet-50'
                 }`}
               >
                 {name}
@@ -276,7 +276,7 @@ function HostGamePanel({
             {game.called.map((name, i) => (
               <li
                 key={name}
-                className="rounded-md border border-violet-500/30 bg-violet-600/10 px-2 py-0.5 text-xs text-violet-200"
+                className="rounded-md border border-violet-200 bg-violet-50 px-2 py-0.5 text-xs text-violet-700"
               >
                 {i + 1}. {name}
               </li>

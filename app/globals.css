@@ -23,4 +23,24 @@
   .btn-icon {
     @apply cursor-pointer rounded-md px-2 py-1 text-sm text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-30;
   }
+
+  /* 이름 빙고(/bingo) 라이트 테마 오버라이드 */
+  .bingo-light .input {
+    @apply border-zinc-300 bg-white text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-violet-500;
+  }
+  .bingo-light .btn-primary {
+    @apply shadow-md shadow-violet-400/40;
+  }
+  .bingo-light .btn-secondary {
+    @apply border-zinc-300 bg-white text-zinc-700 shadow-sm hover:bg-zinc-100;
+  }
+}
+
+@layer utilities {
+  .bingo-light .gradient-text {
+    background: linear-gradient(to right, #7c3aed, #db2777);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
 }

@@ -44,10 +44,10 @@ export default function BingoPlay({initialCode}: {initialCode?: string}) {
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-4 py-8 sm:px-6">
       <header className="mb-6 flex items-center justify-between">
-        <Link href="/bingo" className="text-sm text-zinc-400 transition hover:text-zinc-200">
+        <Link href="/bingo" className="text-sm text-zinc-500 transition hover:text-zinc-900">
           ← 이름 빙고
         </Link>
-        <span className="rounded-full border border-zinc-700 bg-zinc-800 px-3 py-1 text-xs font-medium text-zinc-300">
+        <span className="rounded-full border border-zinc-300 bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-600">
           🙋 참가자
         </span>
       </header>
@@ -112,7 +112,7 @@ function JoinPanel({
     <section className="mx-auto max-w-sm space-y-5 pt-8 text-center">
       <p className="text-4xl">🎟️</p>
       <h1 className="text-2xl font-bold">게임 입장</h1>
-      <p className="text-sm text-zinc-400">진행자에게 받은 6자리 게임 코드를 입력하세요.</p>
+      <p className="text-sm text-zinc-500">진행자에게 받은 6자리 게임 코드를 입력하세요.</p>
       <form
         className="space-y-3"
         onSubmit={e => {
@@ -128,7 +128,7 @@ function JoinPanel({
           maxLength={6}
           autoFocus
         />
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && <p className="text-sm text-red-600">{error}</p>}
         <button className="btn-primary w-full py-3" disabled={code.trim().length < 6 || busy}>
           {busy ? '입장 중…' : '입장하기'}
         </button>
@@ -163,14 +163,14 @@ function WritePanel({game, onDone}: {game: BingoGame; onDone: (player: SavedPlay
     <section className="space-y-5">
       <div>
         <h1 className="text-xl font-bold">{game.title}</h1>
-        <p className="mt-1 text-sm leading-relaxed text-zinc-400">
+        <p className="mt-1 text-sm leading-relaxed text-zinc-500">
           정답이 될 것 같은 이름 {TOTAL_NAMES}개를 적어주세요. 진행자가 정답 보드에 적는
           이름과 일치하면 자동으로 줄이 그어지고 점수를 얻습니다.
         </p>
       </div>
 
       <label className="block">
-        <span className="mb-1 block text-sm text-zinc-300">내 별명</span>
+        <span className="mb-1 block text-sm text-zinc-600">내 별명</span>
         <input
           className="input w-full"
           placeholder="순위표에 표시될 이름"
@@ -181,11 +181,11 @@ function WritePanel({game, onDone}: {game: BingoGame; onDone: (player: SavedPlay
       </label>
 
       <label className="block">
-        <span className="mb-1 flex items-baseline justify-between text-sm text-zinc-300">
+        <span className="mb-1 flex items-baseline justify-between text-sm text-zinc-600">
           <span>이름 {TOTAL_NAMES}개 (줄바꿈 또는 쉼표로 구분)</span>
           <span
             className={
-              names.length === TOTAL_NAMES ? 'font-semibold text-emerald-400' : 'text-zinc-500'
+              names.length === TOTAL_NAMES ? 'font-semibold text-emerald-600' : 'text-zinc-500'
             }
           >
             {names.length} / {TOTAL_NAMES}개
@@ -204,7 +204,7 @@ function WritePanel({game, onDone}: {game: BingoGame; onDone: (player: SavedPlay
           {names.map(name => (
             <span
               key={name}
-              className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-xs text-zinc-300"
+              className="rounded-md border border-zinc-300 bg-white px-2 py-0.5 text-xs text-zinc-600"
             >
               {name}
             </span>
@@ -213,11 +213,11 @@ function WritePanel({game, onDone}: {game: BingoGame; onDone: (player: SavedPlay
       )}
 
       {names.length > TOTAL_NAMES && (
-        <p className="text-sm text-amber-400">
+        <p className="text-sm text-amber-600">
           이름이 {names.length - TOTAL_NAMES}개 많습니다. {TOTAL_NAMES}개만 남겨주세요.
         </p>
       )}
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
       <button className="btn-primary w-full py-3 text-base" disabled={!ready || busy} onClick={submit}>
         {busy
@@ -277,16 +277,16 @@ function PlayPanel({
             {player.nickname} · 코드 {game.code} · 정답 {game.answers.length}/{TOTAL_ANSWERS} 공개
           </p>
         </div>
-        <div className="ml-auto rounded-xl border border-violet-500/40 bg-violet-600/20 px-4 py-2 text-center">
-          <p className="text-[10px] text-violet-300">내 점수</p>
-          <p className="text-2xl leading-none font-bold text-violet-200">{score}점</p>
+        <div className="ml-auto rounded-xl border border-violet-300 bg-violet-100 px-4 py-2 text-center">
+          <p className="text-[10px] text-violet-600">내 점수</p>
+          <p className="text-2xl leading-none font-bold text-violet-700">{score}점</p>
         </div>
       </div>
 
       {lastAnswer && (
-        <p className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 text-center text-sm text-zinc-300">
-          방금 공개된 정답 → <b className="text-lg text-violet-300">{lastAnswer.name}</b>{' '}
-          <span className="font-semibold text-amber-300">({lastAnswer.points}점)</span>
+        <p className="rounded-lg border border-zinc-200 bg-white p-3 text-center text-sm text-zinc-600">
+          방금 공개된 정답 → <b className="text-lg text-violet-600">{lastAnswer.name}</b>{' '}
+          <span className="font-semibold text-amber-600">({lastAnswer.points}점)</span>
         </p>
       )}
 
@@ -306,43 +306,43 @@ function PlayPanel({
                 key={name}
                 className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-all duration-500 ${
                   hit
-                    ? 'border-amber-400/60 bg-amber-500/15 text-zinc-400'
-                    : 'border-zinc-700 bg-zinc-800 text-zinc-100'
+                    ? 'border-amber-300 bg-amber-100 text-zinc-500'
+                    : 'border-zinc-300 bg-zinc-50 text-zinc-900'
                 }`}
               >
                 <span className={hit ? 'line-through decoration-amber-400 decoration-2' : ''}>
                   {name}
                 </span>
-                {hit && <b className="text-xs text-amber-300">+{hit.points}</b>}
+                {hit && <b className="text-xs text-amber-600">+{hit.points}</b>}
               </span>
             );
           })}
         </div>
       </div>
 
-      <p className="text-sm text-zinc-400">
-        <b className="text-zinc-200">{matched.length}</b>개 적중 · 진행자가 정답을 적으면
+      <p className="text-sm text-zinc-500">
+        <b className="text-zinc-800">{matched.length}</b>개 적중 · 진행자가 정답을 적으면
         자동으로 줄이 그어집니다.
       </p>
 
       {done && (
-        <p className="rounded-xl border border-violet-500/40 bg-violet-600/15 p-4 text-center text-lg font-bold text-violet-200">
+        <p className="rounded-xl border border-violet-300 bg-violet-50 p-4 text-center text-lg font-bold text-violet-700">
           🏁 정답이 모두 공개됐어요! 최종 점수 {score}점 ({matched.length}개 적중)
         </p>
       )}
 
       {game.answers.length > 0 && (
-        <details className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3 text-sm">
-          <summary className="cursor-pointer text-zinc-400">
+        <details className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm">
+          <summary className="cursor-pointer text-zinc-500">
             공개된 정답 전체 보기 ({game.answers.length})
           </summary>
           <ol className="mt-2 flex flex-wrap gap-1.5">
             {game.answers.map((a, i) => (
               <li
                 key={`${a.name}-${i}`}
-                className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300"
+                className="rounded-md border border-zinc-300 bg-zinc-50 px-2 py-0.5 text-xs text-zinc-600"
               >
-                {i + 1}. {a.name} <b className="text-amber-300">{a.points}점</b>
+                {i + 1}. {a.name} <b className="text-amber-600">{a.points}점</b>
               </li>
             ))}
           </ol>

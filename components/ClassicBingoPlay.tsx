@@ -41,10 +41,10 @@ export default function ClassicBingoPlay({initialCode}: {initialCode?: string}) 
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-4 py-8 sm:px-6">
       <header className="mb-6 flex items-center justify-between">
-        <Link href="/bingo" className="text-sm text-zinc-400 transition hover:text-zinc-200">
+        <Link href="/bingo" className="text-sm text-zinc-500 transition hover:text-zinc-900">
           ← 이름 빙고
         </Link>
-        <span className="rounded-full border border-zinc-700 bg-zinc-800 px-3 py-1 text-xs font-medium text-zinc-300">
+        <span className="rounded-full border border-zinc-300 bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-600">
           🙋 참가자 · 클래식
         </span>
       </header>
@@ -117,7 +117,7 @@ function JoinPanel({
     <section className="mx-auto max-w-sm space-y-5 pt-8 text-center">
       <p className="text-4xl">🎟️</p>
       <h1 className="text-2xl font-bold">게임 입장</h1>
-      <p className="text-sm text-zinc-400">진행자에게 받은 6자리 게임 코드를 입력하세요.</p>
+      <p className="text-sm text-zinc-500">진행자에게 받은 6자리 게임 코드를 입력하세요.</p>
       <form
         className="space-y-3"
         onSubmit={e => {
@@ -133,7 +133,7 @@ function JoinPanel({
           maxLength={6}
           autoFocus
         />
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && <p className="text-sm text-red-600">{error}</p>}
         <button className="btn-primary w-full py-3" disabled={code.trim().length < 6 || busy}>
           {busy ? '입장 중…' : '입장하기'}
         </button>
@@ -152,7 +152,7 @@ function BuildPanel({game, onDone}: {game: ClassicGame; onDone: (board: string[]
     <section className="space-y-5">
       <div>
         <h1 className="text-xl font-bold">{game.title}</h1>
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-1 text-sm text-zinc-500">
           이름을 눌러 빙고판을 채우세요. 판의 이름을 누르면 되돌릴 수 있어요.
         </p>
       </div>
@@ -168,10 +168,10 @@ function BuildPanel({game, onDone}: {game: ClassicGame; onDone: (board: string[]
               onClick={() => name && setPlaced(placed.filter(n => n !== name))}
               className={`flex aspect-square cursor-pointer items-center justify-center rounded-lg border p-1 text-center text-[11px] leading-tight font-medium break-keep sm:text-sm ${
                 name
-                  ? 'border-violet-500/40 bg-violet-600/20 text-zinc-100 hover:bg-violet-600/30'
+                  ? 'border-violet-300 bg-violet-100 text-zinc-900 hover:bg-violet-200/80'
                   : isNext
-                    ? 'border-dashed border-violet-400 bg-zinc-900'
-                    : 'border-dashed border-zinc-800 bg-zinc-900/50'
+                    ? 'border-dashed border-violet-400 bg-white'
+                    : 'border-dashed border-zinc-200 bg-zinc-50'
               }`}
             >
               {name ?? (isNext ? '▼' : '')}
@@ -181,8 +181,8 @@ function BuildPanel({game, onDone}: {game: ClassicGame; onDone: (board: string[]
       </div>
 
       <div className="flex items-center justify-between">
-        <p className="text-sm text-zinc-400">
-          남은 이름 <b className="text-zinc-200">{remaining.length}</b>개
+        <p className="text-sm text-zinc-500">
+          남은 이름 <b className="text-zinc-800">{remaining.length}</b>개
         </p>
         <div className="flex gap-2">
           <button className="btn-secondary" onClick={() => setPlaced([])} disabled={!placed.length}>
@@ -204,7 +204,7 @@ function BuildPanel({game, onDone}: {game: ClassicGame; onDone: (board: string[]
             <button
               key={name}
               onClick={() => setPlaced([...placed, name])}
-              className="cursor-pointer rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-100 transition hover:border-violet-400"
+              className="cursor-pointer rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-900 transition hover:border-violet-400"
             >
               {name}
             </button>
@@ -272,15 +272,15 @@ function PlayPanel({
             코드 {game.code} · 실시간 연결됨 · {game.called.length}개 지워짐
           </p>
         </div>
-        <div className="ml-auto rounded-xl border border-violet-500/40 bg-violet-600/20 px-4 py-2 text-center">
-          <p className="text-[10px] text-violet-300">빙고</p>
-          <p className="text-2xl leading-none font-bold text-violet-200">{lines.length}줄</p>
+        <div className="ml-auto rounded-xl border border-violet-300 bg-violet-100 px-4 py-2 text-center">
+          <p className="text-[10px] text-violet-600">빙고</p>
+          <p className="text-2xl leading-none font-bold text-violet-700">{lines.length}줄</p>
         </div>
       </div>
 
       {lastCalled && (
-        <p className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 text-center text-sm text-zinc-300">
-          방금 지워진 이름 → <b className="text-lg text-violet-300">{lastCalled}</b>
+        <p className="rounded-lg border border-zinc-200 bg-white p-3 text-center text-sm text-zinc-600">
+          방금 지워진 이름 → <b className="text-lg text-violet-600">{lastCalled}</b>
         </p>
       )}
 
@@ -305,10 +305,10 @@ function PlayPanel({
                 key={i}
                 className={`flex aspect-square items-center justify-center rounded-lg border p-1 text-center text-[11px] leading-tight font-medium break-keep transition-all duration-500 sm:text-sm ${
                   inLine
-                    ? 'border-amber-400 bg-amber-500/25 text-amber-100'
+                    ? 'border-amber-400 bg-amber-200/80 text-amber-900'
                     : called
-                      ? 'border-violet-500/50 bg-violet-600/30 text-zinc-400 line-through'
-                      : 'border-zinc-700 bg-zinc-800 text-zinc-100'
+                      ? 'border-violet-300 bg-violet-200/80 text-zinc-500 line-through'
+                      : 'border-zinc-300 bg-zinc-50 text-zinc-900'
                 } ${isFlash ? 'scale-105 ring-2 ring-violet-400' : ''}`}
               >
                 {name}
@@ -319,15 +319,15 @@ function PlayPanel({
       </div>
 
       {game.called.length > 0 && (
-        <details className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3 text-sm">
-          <summary className="cursor-pointer text-zinc-400">
+        <details className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm">
+          <summary className="cursor-pointer text-zinc-500">
             지워진 이름 전체 보기 ({game.called.length})
           </summary>
           <ol className="mt-2 flex flex-wrap gap-1.5">
             {game.called.map((name, i) => (
               <li
                 key={name}
-                className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300"
+                className="rounded-md border border-zinc-300 bg-zinc-50 px-2 py-0.5 text-xs text-zinc-600"
               >
                 {i + 1}. {name}
               </li>

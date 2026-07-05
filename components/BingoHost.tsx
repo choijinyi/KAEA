@@ -20,10 +20,10 @@ import {
 const LAST_HOST_KEY = 'bingo-last-host-code';
 
 const TIER_STYLE: Record<number, string> = {
-  100: 'border-sky-500/40 bg-sky-600/15 text-sky-200',
-  200: 'border-emerald-500/40 bg-emerald-600/15 text-emerald-200',
-  300: 'border-amber-500/40 bg-amber-600/15 text-amber-200',
-  500: 'border-rose-500/40 bg-rose-600/15 text-rose-200',
+  100: 'border-sky-200 bg-sky-50 text-sky-800',
+  200: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+  300: 'border-amber-200 bg-amber-50 text-amber-800',
+  500: 'border-rose-200 bg-rose-50 text-rose-800',
 };
 
 export default function BingoHost({resumeCode}: {resumeCode?: string}) {
@@ -49,13 +49,13 @@ export default function BingoHost({resumeCode}: {resumeCode?: string}) {
   }, [resumeCode]);
 
   if (loading) {
-    return <Shell><p className="py-24 text-center text-zinc-400">게임을 불러오는 중…</p></Shell>;
+    return <Shell><p className="py-24 text-center text-zinc-500">게임을 불러오는 중…</p></Shell>;
   }
 
   return (
     <Shell>
       {error && (
-        <p className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
+        <p className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-600">
           {error}
         </p>
       )}
@@ -72,10 +72,10 @@ function Shell({children}: {children: React.ReactNode}) {
   return (
     <main className="mx-auto min-h-screen max-w-4xl px-4 py-8 sm:px-6">
       <header className="mb-6 flex items-center justify-between">
-        <Link href="/bingo" className="text-sm text-zinc-400 transition hover:text-zinc-200">
+        <Link href="/bingo" className="text-sm text-zinc-500 transition hover:text-zinc-900">
           ← 이름 빙고
         </Link>
-        <span className="rounded-full border border-violet-500/40 bg-violet-600/20 px-3 py-1 text-xs font-medium text-violet-300">
+        <span className="rounded-full border border-violet-300 bg-violet-100 px-3 py-1 text-xs font-medium text-violet-600">
           🎤 진행자
         </span>
       </header>
@@ -114,7 +114,7 @@ function SetupPanel({
       <div className="text-center">
         <p className="text-4xl">🎤</p>
         <h1 className="mt-3 text-2xl font-bold">새 게임 만들기</h1>
-        <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+        <p className="mt-2 text-sm leading-relaxed text-zinc-500">
           게임을 만들면 참가자용 코드가 발급됩니다. 참가자들이 이름 25개를 적는 동안
           진행자는 정답 보드에 100·200·300·500점짜리 이름을 3개씩 적어 공개합니다.
         </p>
@@ -123,14 +123,14 @@ function SetupPanel({
       {lastCode && (
         <Link
           href={`/bingo/host?code=${lastCode}`}
-          className="block rounded-lg border border-zinc-700 bg-zinc-900 p-3 text-sm text-zinc-300 transition hover:bg-zinc-800"
+          className="block rounded-lg border border-zinc-300 bg-white p-3 text-sm text-zinc-600 transition hover:bg-zinc-100"
         >
-          ▶️ 최근 게임 이어서 진행하기 — 코드 <b className="text-violet-300">{lastCode}</b>
+          ▶️ 최근 게임 이어서 진행하기 — 코드 <b className="text-violet-600">{lastCode}</b>
         </Link>
       )}
 
       <label className="block">
-        <span className="mb-1 block text-sm text-zinc-300">게임 이름 (선택)</span>
+        <span className="mb-1 block text-sm text-zinc-600">게임 이름 (선택)</span>
         <input
           className="input w-full"
           placeholder="예) 우리 반 이름 맞히기 빙고"
@@ -140,7 +140,7 @@ function SetupPanel({
         />
       </label>
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
       <button className="btn-primary w-full py-3 text-base" disabled={busy} onClick={handleCreate}>
         {busy ? '만드는 중…' : '게임 만들기 🎲'}
@@ -216,12 +216,12 @@ function HostGamePanel({
 
   return (
     <section className="space-y-6">
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+      <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-lg shadow-violet-100">
         <h1 className="text-xl font-bold">{game.title}</h1>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <div>
             <p className="text-xs text-zinc-500">게임 코드</p>
-            <p className="text-3xl font-bold tracking-[0.2em] text-violet-300">{game.code}</p>
+            <p className="text-3xl font-bold tracking-[0.2em] text-violet-600">{game.code}</p>
           </div>
           <div className="ml-auto flex gap-2">
             <button className="btn-secondary" onClick={() => copy(game.code, 'code')}>
@@ -239,14 +239,14 @@ function HostGamePanel({
         <div>
           <div className="mb-3 flex items-baseline justify-between">
             <h2 className="font-semibold">📝 정답 보드</h2>
-            <span className="text-sm text-zinc-400">
-              <b className="text-violet-300">{game.answers.length}</b> / {TOTAL_ANSWERS} 공개
+            <span className="text-sm text-zinc-500">
+              <b className="text-violet-600">{game.answers.length}</b> / {TOTAL_ANSWERS} 공개
             </span>
           </div>
-          <p className="mb-3 text-sm text-zinc-400">
+          <p className="mb-3 text-sm text-zinc-500">
             정답을 적는 순간 참가자 화면에서 해당 이름에 줄이 그어지고 점수가 올라갑니다.
           </p>
-          {syncError && <p className="mb-2 text-sm text-red-400">{syncError}</p>}
+          {syncError && <p className="mb-2 text-sm text-red-600">{syncError}</p>}
           <div className="space-y-3">
             {TIERS.map(points => (
               <TierRow
@@ -263,10 +263,10 @@ function HostGamePanel({
         <div>
           <div className="mb-3 flex items-baseline justify-between">
             <h2 className="font-semibold">🏆 실시간 순위</h2>
-            <span className="text-sm text-zinc-400">참가자 {players.length}명</span>
+            <span className="text-sm text-zinc-500">참가자 {players.length}명</span>
           </div>
           {ranking.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-zinc-700 p-6 text-center text-sm text-zinc-500">
+            <p className="rounded-lg border border-dashed border-zinc-300 p-6 text-center text-sm text-zinc-500">
               아직 참가자가 없어요.
               <br />
               코드나 링크를 공유해주세요!
@@ -278,16 +278,16 @@ function HostGamePanel({
                   key={player.id}
                   className={`flex items-center gap-3 rounded-lg border p-2.5 ${
                     i === 0 && score > 0
-                      ? 'border-amber-400/50 bg-amber-500/10'
-                      : 'border-zinc-800 bg-zinc-900/60'
+                      ? 'border-amber-300 bg-amber-50'
+                      : 'border-zinc-200 bg-white'
                   }`}
                 >
-                  <span className="w-7 text-center text-sm font-bold text-zinc-400">
+                  <span className="w-7 text-center text-sm font-bold text-zinc-500">
                     {i === 0 && score > 0 ? '👑' : i + 1}
                   </span>
                   <span className="min-w-0 flex-1 truncate font-medium">{player.nickname}</span>
                   <span className="text-xs text-zinc-500">{matched.length}개 적중</span>
-                  <span className="w-16 text-right font-bold text-violet-300">{score}점</span>
+                  <span className="w-16 text-right font-bold text-violet-600">{score}점</span>
                 </li>
               ))}
             </ol>
@@ -327,12 +327,12 @@ function TierRow({
           {answers.map(a => (
             <span
               key={a.name}
-              className="inline-flex items-center gap-1 rounded-md bg-zinc-950/60 px-2 py-1 text-sm font-medium text-zinc-100"
+              className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-sm font-medium text-zinc-900 shadow-sm"
             >
               {a.name}
               <button
                 onClick={() => onRemove(a)}
-                className="cursor-pointer text-zinc-500 transition hover:text-red-400"
+                className="cursor-pointer text-zinc-500 transition hover:text-red-600"
                 title="정답 취소"
               >
                 ×
@@ -342,7 +342,7 @@ function TierRow({
           {Array.from({length: ANSWERS_PER_TIER - answers.length}, (_, i) => (
             <span
               key={i}
-              className="rounded-md border border-dashed border-zinc-600/60 px-2 py-1 text-sm text-zinc-600"
+              className="rounded-md border border-dashed border-zinc-300 px-2 py-1 text-sm text-zinc-400"
             >
               빈칸
             </span>
@@ -369,7 +369,7 @@ function TierRow({
           </button>
         </form>
       )}
-      {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
     </div>
   );
 }
