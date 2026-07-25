@@ -1,6 +1,6 @@
-import {Conversation, DEFAULT_SETTINGS, SermonSettings} from './types';
+import {Conversation, DEFAULT_SETTINGS, MODEL_OPTIONS, SermonSettings} from './types';
 
-const KEY_API = 'sermon.anthropicApiKey';
+const KEY_API = 'sermon.geminiApiKey';
 const KEY_SETTINGS = 'sermon.settings';
 const KEY_CONVERSATIONS = 'sermon.conversations';
 
@@ -24,7 +24,12 @@ export function loadSettings(): SermonSettings {
   try {
     const raw = localStorage.getItem(KEY_SETTINGS);
     if (!raw) return DEFAULT_SETTINGS;
-    return {...DEFAULT_SETTINGS, ...JSON.parse(raw)};
+    const settings = {...DEFAULT_SETTINGS, ...JSON.parse(raw)};
+    // 이전 버전(다른 제공자)의 모델 ID가 저장되어 있으면 기본 모델로 되돌린다.
+    if (!MODEL_OPTIONS.some(m => m.id === settings.model)) {
+      settings.model = DEFAULT_SETTINGS.model;
+    }
+    return settings;
   } catch {
     return DEFAULT_SETTINGS;
   }

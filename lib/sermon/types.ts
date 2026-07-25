@@ -25,24 +25,24 @@ export interface SermonSettings {
 
 export const MODEL_OPTIONS: {id: string; label: string; description: string}[] = [
   {
-    id: 'claude-opus-5',
-    label: 'Claude Opus 5',
+    id: 'gemini-2.5-pro',
+    label: 'Gemini 2.5 Pro',
     description: '가장 깊이 있는 연구 품질 (권장)',
   },
   {
-    id: 'claude-sonnet-5',
-    label: 'Claude Sonnet 5',
+    id: 'gemini-2.5-flash',
+    label: 'Gemini 2.5 Flash',
     description: '속도와 품질의 균형, 비용 절감',
   },
   {
-    id: 'claude-haiku-4-5',
-    label: 'Claude Haiku 4.5',
+    id: 'gemini-2.5-flash-lite',
+    label: 'Gemini 2.5 Flash-Lite',
     description: '빠른 응답, 가장 저렴',
   },
 ];
 
 export const DEFAULT_SETTINGS: SermonSettings = {
-  model: 'claude-opus-5',
+  model: 'gemini-2.5-pro',
   tradition: '',
   context: '',
 };

@@ -1,44 +1,41 @@
-import Anthropic from '@anthropic-ai/sdk';
-import type {BetaMessageStreamParams} from '@anthropic-ai/sdk/resources/beta/messages/messages';
+import {GoogleGenAI} from '@google/genai';
 import {SERMON_SYSTEM_PROMPT} from './prompt';
 import {ChatMessage, SermonSettings} from './types';
 
-// 사용자의 API 키로 브라우저에서 Anthropic API를 직접 호출한다.
-// 키는 사용자의 브라우저를 떠나 Anthropic 외의 서버로 전송되지 않는다.
-function createClient(apiKey: string) {
-  return new Anthropic({apiKey, dangerouslyAllowBrowser: true});
-}
+// 사용자의 Google Gemini API 키로 브라우저에서 Gemini API를 직접 호출한다.
+// 키는 사용자의 브라우저를 떠나 Google 외의 서버로 전송되지 않는다.
 
 /** 키 유효성 확인 — 모델 목록 조회는 토큰을 소비하지 않는다. */
 export async function validateApiKey(apiKey: string): Promise<void> {
-  const client = createClient(apiKey);
-  await client.models.list();
+  const ai = new GoogleGenAI({apiKey});
+  await ai.models.list();
 }
 
-function buildSystem(settings: SermonSettings) {
-  const blocks: Anthropic.Beta.BetaTextBlockParam[] = [
-    {
-      type: 'text',
-      text: SERMON_SYSTEM_PROMPT,
-      cache_control: {type: 'ephemeral'},
-    },
-  ];
-  const extras: string[] = [];
+function buildSystemInstruction(settings: SermonSettings): string {
+  const parts = [SERMON_SYSTEM_PROMPT];
   if (settings.tradition.trim()) {
-    extras.push(`사용자의 교단/신학 전통: ${settings.tradition.trim()}`);
+    parts.push(`사용자의 교단/신학 전통: ${settings.tradition.trim()}`);
   }
   if (settings.context.trim()) {
-    extras.push(`사용자의 기본 설교 상황: ${settings.context.trim()}`);
+    parts.push(`사용자의 기본 설교 상황: ${settings.context.trim()}`);
   }
-  if (extras.length > 0) {
-    blocks.push({type: 'text', text: extras.join('\n')});
-  }
-  return blocks;
+  return parts.join('\n\n');
 }
 
 export interface StreamHandle {
   abort: () => void;
   done: Promise<{text: string; stopReason: string | null}>;
+}
+
+/** Gemini finishReason을 앱 내부 표기로 정규화한다. */
+function normalizeStopReason(finish: string | null, blocked: boolean): string | null {
+  if (blocked) return 'refusal';
+  if (!finish) return null;
+  if (finish === 'MAX_TOKENS') return 'max_tokens';
+  if (finish === 'SAFETY' || finish === 'PROHIBITED_CONTENT' || finish === 'BLOCKLIST') {
+    return 'refusal';
+  }
+  return finish.toLowerCase();
 }
 
 export function streamChat(
@@ -47,57 +44,63 @@ export function streamChat(
   history: ChatMessage[],
   onDelta: (text: string) => void,
 ): StreamHandle {
-  const client = createClient(apiKey);
+  const ai = new GoogleGenAI({apiKey});
+  const controller = new AbortController();
 
-  const params: BetaMessageStreamParams = {
-    model: settings.model,
-    max_tokens: 64000,
-    system: buildSystem(settings),
-    messages: history.map(m => ({role: m.role, content: m.content})),
-  };
+  const done = (async () => {
+    const stream = await ai.models.generateContentStream({
+      model: settings.model,
+      contents: history.map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{text: m.content}],
+      })),
+      config: {
+        systemInstruction: buildSystemInstruction(settings),
+        abortSignal: controller.signal,
+      },
+    });
 
-  // Opus 5는 안전 분류기가 요청을 거절할 수 있으므로 서버측 폴백을 기본 적용한다.
-  if (settings.model === 'claude-opus-5') {
-    params.betas = ['server-side-fallback-2026-07-01'];
-    params.fallbacks = 'default';
-  }
+    let text = '';
+    let finish: string | null = null;
+    let blocked = false;
+    for await (const chunk of stream) {
+      const t = chunk.text;
+      if (t) {
+        text += t;
+        onDelta(t);
+      }
+      finish = chunk.candidates?.[0]?.finishReason ?? finish;
+      if (chunk.promptFeedback?.blockReason) blocked = true;
+    }
+    return {text, stopReason: normalizeStopReason(finish, blocked)};
+  })();
 
-  const stream = client.beta.messages.stream(params);
-  stream.on('text', onDelta);
-
-  const done = stream.finalMessage().then(message => {
-    const text = message.content
-      .filter(b => b.type === 'text')
-      .map(b => b.text)
-      .join('');
-    return {text, stopReason: message.stop_reason};
-  });
-
-  return {abort: () => stream.abort(), done};
+  return {abort: () => controller.abort(), done};
 }
 
 /** 사용자에게 보여줄 한국어 오류 메시지로 변환 */
 export function describeError(error: unknown): string {
-  if (error instanceof Anthropic.APIUserAbortError) {
-    return '';
+  const msg = error instanceof Error ? error.message : String(error);
+  if (
+    (error instanceof Error && error.name === 'AbortError') ||
+    /abort/i.test(msg)
+  ) {
+    return ''; // 사용자가 직접 중단한 경우
   }
-  if (error instanceof Anthropic.AuthenticationError) {
-    return 'API 키가 유효하지 않습니다. 설정에서 키를 다시 확인해 주세요.';
+  if (/API key not valid|API_KEY_INVALID|PERMISSION_DENIED|401|403/i.test(msg)) {
+    return 'API 키가 유효하지 않습니다. Google AI Studio(aistudio.google.com/apikey)에서 발급한 키인지 확인해 주세요.';
   }
-  if (error instanceof Anthropic.PermissionDeniedError) {
-    return 'API 키에 이 모델을 사용할 권한이 없습니다. 다른 모델을 선택하거나 콘솔에서 키 권한을 확인해 주세요.';
+  if (/quota|RESOURCE_EXHAUSTED|429/i.test(msg)) {
+    return 'API 사용량 한도에 도달했습니다. 잠시 후 다시 시도하거나 설정에서 다른 모델을 선택해 주세요.';
   }
-  if (error instanceof Anthropic.RateLimitError) {
-    return '요청 한도를 초과했습니다. 잠시 후 다시 시도해 주세요.';
+  if (/NOT_FOUND|not found|404/i.test(msg)) {
+    return '선택한 모델을 사용할 수 없습니다. 설정에서 다른 모델을 선택해 주세요.';
   }
-  if (error instanceof Anthropic.BadRequestError) {
-    return `요청이 거부되었습니다: ${error.message}`;
+  if (/UNAVAILABLE|OVERLOADED|503/i.test(msg)) {
+    return '모델이 일시적으로 과부하 상태입니다. 잠시 후 다시 시도해 주세요.';
   }
-  if (error instanceof Anthropic.APIConnectionError) {
+  if (/Failed to fetch|network|ENOTFOUND/i.test(msg)) {
     return '네트워크 연결에 실패했습니다. 인터넷 연결을 확인해 주세요.';
   }
-  if (error instanceof Anthropic.APIError) {
-    return `API 오류가 발생했습니다 (${error.status ?? '?'}): ${error.message}`;
-  }
-  return error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+  return msg || '알 수 없는 오류가 발생했습니다.';
 }

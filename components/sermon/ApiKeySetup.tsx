@@ -45,19 +45,19 @@ export default function ApiKeySetup({onReady}: {onReady: (key: string) => void})
         <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <div className="mb-4 flex items-center gap-2 text-stone-700">
             <KeyRound className="h-5 w-5 text-amber-700" />
-            <h2 className="font-semibold">Anthropic API 키 등록</h2>
+            <h2 className="font-semibold">Google Gemini API 키 등록</h2>
           </div>
           <p className="mb-4 text-sm leading-relaxed text-stone-500">
-            이 앱은 본인의 Anthropic API 키로 작동합니다. 키가 없다면{' '}
+            이 앱은 본인의 Google Gemini API 키로 작동합니다. 키가 없다면{' '}
             <a
-              href="https://console.anthropic.com/settings/keys"
+              href="https://aistudio.google.com/apikey"
               target="_blank"
               rel="noreferrer"
               className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800"
             >
-              console.anthropic.com
+              Google AI Studio
             </a>
-            에서 발급받을 수 있습니다.
+            에서 무료로 발급받을 수 있습니다.
           </p>
           <input
             type="password"
@@ -66,7 +66,7 @@ export default function ApiKeySetup({onReady}: {onReady: (key: string) => void})
             onKeyDown={e => {
               if (e.key === 'Enter') submit();
             }}
-            placeholder="sk-ant-..."
+            placeholder="AIza..."
             autoFocus
             className="w-full rounded-lg border border-stone-300 bg-stone-50 px-3 py-2.5 font-mono text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-amber-600 focus:bg-white"
           />
@@ -82,8 +82,8 @@ export default function ApiKeySetup({onReady}: {onReady: (key: string) => void})
           <div className="mt-4 flex items-start gap-2 rounded-lg bg-stone-50 p-3 text-xs leading-relaxed text-stone-500">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
             <span>
-              입력한 키는 이 브라우저에만 저장되며, Anthropic API 호출에만 사용됩니다. 별도의 서버로
-              전송되거나 수집되지 않습니다.
+              입력한 키는 이 브라우저에만 저장되며, Google Gemini API 호출에만 사용됩니다. 별도의
+              서버로 전송되거나 수집되지 않습니다.
             </span>
           </div>
         </div>

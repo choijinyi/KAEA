@@ -1,5 +1,5 @@
 // 설교도우미 챗봇 운영 지침 (시스템 프롬프트)
-// 이 텍스트는 모든 대화에서 프롬프트 캐싱 대상이므로 수정 시 캐시가 무효화됩니다.
+// 모든 대화의 systemInstruction으로 전달됩니다.
 
 export const SERMON_SYSTEM_PROMPT = `설교도우미 챗봇 운영 지침
 

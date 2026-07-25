@@ -15,14 +15,13 @@
 
 ## API 키 (BYOK)
 
-첫 실행 시 **본인의 Anthropic API 키**를 입력받습니다
-([console.anthropic.com](https://console.anthropic.com/settings/keys)에서 발급).
+첫 실행 시 **본인의 Google Gemini API 키**를 입력받습니다
+([Google AI Studio](https://aistudio.google.com/apikey)에서 무료 발급).
 
-- 키는 **사용자 브라우저의 localStorage에만 저장**되며, 브라우저에서 Anthropic API를
+- 키는 **사용자 브라우저의 localStorage에만 저장**되며, 브라우저에서 Gemini API를
   직접 호출합니다. 별도의 서버로 전송·수집되지 않습니다.
 - 서버 함수를 거치지 않으므로 Vercel 함수 타임아웃 없이 긴 연구 응답도 스트리밍됩니다.
-- 모델 선택: Claude Opus 5(기본) · Claude Sonnet 5 · Claude Haiku 4.5
-- 긴 운영 지침(시스템 프롬프트)은 프롬프트 캐싱을 사용해 반복 비용을 절감합니다.
+- 모델 선택: Gemini 2.5 Pro(기본) · Gemini 2.5 Flash · Gemini 2.5 Flash-Lite
 
 ## 실행 방법
 
@@ -36,7 +35,7 @@ npm run dev
 ## 기술 스택
 
 - Next.js 15 (App Router) · React 19 · Tailwind CSS 4
-- Anthropic TypeScript SDK (브라우저 직접 호출, 스트리밍)
+- Google Gen AI SDK(@google/genai) — 브라우저 직접 호출, 스트리밍
 - react-markdown + remark-gfm (연구 결과 렌더링)
 
 ---
