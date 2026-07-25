@@ -1,5 +1,5 @@
-import Studio from '@/components/Studio';
+import SermonApp from '@/components/sermon/SermonApp';
 
 export default function Home() {
-  return <Studio />;
+  return <SermonApp />;
 }

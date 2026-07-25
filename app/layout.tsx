@@ -3,9 +3,9 @@ import { ReactNode } from 'react';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Playlist Studio — 노래를 유튜브 플레이리스트 영상으로',
+  title: '설교준비 도우미 — 성경 연구와 설교 준비를 돕는 AI',
   description:
-    '음악을 업로드하면 AI가 가사를 추출해 자막을 만들고, 곡에 어울리는 배경 그림을 그려 유튜브 플레이리스트 영상을 완성합니다.',
+    '개혁주의·복음주의 관점에서 성경 본문 연구, 해석 검증, 설교 아웃라인과 원고 초안 작성을 단계별로 돕는 설교 준비 도우미입니다.',
 };
 
 export default function RootLayout({children}: {children: ReactNode}) {
