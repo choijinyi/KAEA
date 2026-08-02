@@ -5,7 +5,9 @@ import {parseReference} from '@/lib/books';
 import {
   chunkVerses,
   DEFAULT_VOICE,
-  synthesize,
+  encodeMp3,
+  pcmToWavBlob,
+  synthesizePcm,
   TtsChunk,
   TtsError,
   VOICES,
@@ -51,7 +53,16 @@ export default function Home() {
   const [progress, setProgress] = useState({current: 0, total: 0});
   const [ttsError, setTtsError] = useState('');
 
+  const [saving, setSaving] = useState(false);
+  const [saveProgress, setSaveProgress] = useState({current: 0, total: 0});
+
   const sessionRef = useRef<PlaySession | null>(null);
+  const saveSessionRef = useRef<{cancelled: boolean} | null>(null);
+  // 같은 장·목소리로 합성한 음성은 재생/저장이 공유하도록 캐시한다
+  const pcmCacheRef = useRef<{
+    key: string;
+    promises: Array<Promise<Uint8Array> | undefined>;
+  } | null>(null);
 
   useEffect(() => {
     // 저장된 키/목소리는 SSR과의 하이드레이션 불일치를 피하려고 마운트 후에 불러온다
@@ -83,8 +94,44 @@ export default function Home() {
     setProgress({current: 0, total: 0});
   }, []);
 
-  // 페이지를 떠날 때 재생 정리
-  useEffect(() => stopReading, [stopReading]);
+  const cancelSaving = useCallback(() => {
+    if (saveSessionRef.current) saveSessionRef.current.cancelled = true;
+    saveSessionRef.current = null;
+    setSaving(false);
+    setSaveProgress({current: 0, total: 0});
+  }, []);
+
+  // 페이지를 떠날 때 재생/저장 정리
+  useEffect(
+    () => () => {
+      stopReading();
+      cancelSaving();
+    },
+    [stopReading, cancelSaving],
+  );
+
+  /** i번째 구간의 PCM을 캐시에서 꺼내거나 새로 합성한다 (재생·저장 공유) */
+  const ensureChunkPcm = useCallback(
+    (key: string, chunks: TtsChunk[], i: number) => {
+      let cache = pcmCacheRef.current;
+      if (!cache || cache.key !== key) {
+        cache = {key, promises: []};
+        pcmCacheRef.current = cache;
+      }
+      if (!cache.promises[i]) {
+        const stable = cache;
+        cache.promises[i] = synthesizePcm(apiKey.trim(), chunks[i].text, voice).catch(
+          (e) => {
+            // 실패한 합성은 캐시에서 지워 다음에 다시 시도할 수 있게 한다
+            stable.promises[i] = undefined;
+            throw e;
+          },
+        );
+      }
+      return cache.promises[i];
+    },
+    [apiKey, voice],
+  );
 
   const loadChapter = useCallback(
     async (text: string) => {
@@ -94,6 +141,7 @@ export default function Home() {
         return;
       }
       stopReading();
+      cancelSaving();
       setLoading(true);
       setError('');
       setTtsError('');
@@ -112,7 +160,7 @@ export default function Home() {
         setLoading(false);
       }
     },
-    [stopReading],
+    [stopReading, cancelSaving],
   );
 
   const playBlob = (blob: Blob, session: PlaySession) =>
@@ -145,22 +193,23 @@ export default function Home() {
     sessionRef.current = session;
 
     const chunks = chunkVerses(chapter.verses);
+    const cacheKey = `${chapter.book}|${chapter.chapter}|${voice}`;
     setProgress({current: 0, total: chunks.length});
     setPlayStatus('loading');
 
     try {
       // 현재 구간을 재생하는 동안 다음 구간을 미리 합성한다
-      let next = synthesize(apiKey.trim(), chunks[0].text, voice);
+      let next = ensureChunkPcm(cacheKey, chunks, 0);
       for (let i = 0; i < chunks.length; i++) {
-        const blob = await next;
+        const pcm = await next;
         if (session.stopped) return;
         if (i + 1 < chunks.length) {
-          next = synthesize(apiKey.trim(), chunks[i + 1].text, voice);
+          next = ensureChunkPcm(cacheKey, chunks, i + 1);
         }
         setPlayStatus('playing');
         setCurrentChunk(chunks[i]);
         setProgress({current: i + 1, total: chunks.length});
-        await playBlob(blob, session);
+        await playBlob(pcmToWavBlob(pcm), session);
         if (session.stopped) return;
       }
       stopReading();
@@ -185,6 +234,62 @@ export default function Home() {
     } else if (playStatus === 'paused') {
       audio.play();
       setPlayStatus('playing');
+    }
+  };
+
+  /** 장 전체를 합성해 MP3 파일로 다운로드한다 */
+  const downloadMp3 = async () => {
+    if (!chapter || saving) return;
+    if (!apiKey.trim()) {
+      setSettingsOpen(true);
+      setTtsError('먼저 설정에서 Gemini API 키를 입력해 주세요.');
+      return;
+    }
+    setTtsError('');
+
+    const session = {cancelled: false};
+    saveSessionRef.current = session;
+
+    const chunks = chunkVerses(chapter.verses);
+    const cacheKey = `${chapter.book}|${chapter.chapter}|${voice}`;
+    const fileName = `${chapter.book} ${chapter.chapter}장 (개역개정).mp3`;
+    setSaving(true);
+    setSaveProgress({current: 0, total: chunks.length});
+
+    try {
+      const pcms: Uint8Array[] = [];
+      for (let i = 0; i < chunks.length; i++) {
+        const pcm = await ensureChunkPcm(cacheKey, chunks, i);
+        if (session.cancelled) return;
+        pcms.push(pcm);
+        setSaveProgress({current: i + 1, total: chunks.length});
+      }
+
+      const mp3 = encodeMp3(pcms);
+      if (session.cancelled) return;
+
+      const url = URL.createObjectURL(mp3);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } catch (e) {
+      if (!session.cancelled) {
+        setTtsError(
+          e instanceof TtsError || e instanceof Error
+            ? e.message
+            : 'MP3 저장 중 오류가 발생했습니다.',
+        );
+      }
+    } finally {
+      if (saveSessionRef.current === session) {
+        saveSessionRef.current = null;
+        setSaving(false);
+        setSaveProgress({current: 0, total: 0});
+      }
     }
   };
 
@@ -373,6 +478,19 @@ export default function Home() {
                     </span>
                   )}
                 </>
+              )}
+              {saving ? (
+                <span className="flex items-center gap-2 text-sm text-amber-900">
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-amber-700 border-t-transparent" />
+                  MP3 만드는 중… {saveProgress.current}/{saveProgress.total} 구간
+                  <button onClick={cancelSaving} className="btn-icon">
+                    취소
+                  </button>
+                </span>
+              ) : (
+                <button onClick={downloadMp3} className="btn-secondary">
+                  💾 MP3 저장
+                </button>
               )}
             </div>
             {ttsError && <p className="mt-2 text-xs text-red-600">{ttsError}</p>}

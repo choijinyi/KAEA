@@ -1,5 +1,7 @@
 /** 구글 제미나이 TTS 호출과 오디오 변환 유틸 (브라우저에서 실행) */
 
+import {Mp3Encoder} from '@breezystack/lamejs';
+
 const TTS_MODEL = 'gemini-2.5-flash-preview-tts';
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -93,13 +95,36 @@ export class TtsError extends Error {
   }
 }
 
-/** 텍스트 한 덩어리를 제미나이 TTS로 합성해 WAV Blob을 돌려준다 */
-export async function synthesize(
+/** PCM(24kHz mono 16bit) 조각들을 이어붙여 MP3 Blob으로 인코딩한다 */
+export function encodeMp3(pcmChunks: Uint8Array[], sampleRate = 24000): Blob {
+  const encoder = new Mp3Encoder(1, sampleRate, 96);
+  const parts: Uint8Array[] = [];
+  const BLOCK = 1152; // MP3 프레임 크기
+
+  for (const pcm of pcmChunks) {
+    const samples = new Int16Array(
+      pcm.buffer,
+      pcm.byteOffset,
+      Math.floor(pcm.byteLength / 2),
+    );
+    for (let i = 0; i < samples.length; i += BLOCK) {
+      const encoded = encoder.encodeBuffer(samples.subarray(i, i + BLOCK));
+      if (encoded.length) parts.push(encoded);
+    }
+  }
+  const tail = encoder.flush();
+  if (tail.length) parts.push(tail);
+
+  return new Blob(parts as BlobPart[], {type: 'audio/mpeg'});
+}
+
+/** 텍스트 한 덩어리를 제미나이 TTS로 합성해 PCM(24kHz mono 16bit)을 돌려준다 */
+export async function synthesizePcm(
   apiKey: string,
   text: string,
   voice: string,
   signal?: AbortSignal,
-): Promise<Blob> {
+): Promise<Uint8Array> {
   const prompt =
     '다음 성경 본문을 차분하고 따뜻한 톤으로, 또박또박 자연스럽게 낭독하세요:\n\n' +
     text;
@@ -147,5 +172,5 @@ export async function synthesize(
     throw new TtsError('음성 데이터를 받지 못했습니다. 다시 시도해 주세요.');
   }
 
-  return pcmToWavBlob(base64ToBytes(b64));
+  return base64ToBytes(b64);
 }

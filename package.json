@@ -10,6 +10,7 @@
     "clean": "next clean"
   },
   "dependencies": {
+    "@breezystack/lamejs": "^1.2.7",
     "autoprefixer": "^10.4.21",
     "next": "^15.4.9",
     "postcss": "^8.5.6",
