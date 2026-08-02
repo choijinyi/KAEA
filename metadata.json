@@ -1,5 +1,5 @@
 {
-  "name": "Playlist Studio",
-  "description": "노래를 업로드하면 AI가 가사 자막과 배경 그림을 만들어 유튜브 플레이리스트 영상을 완성하는 웹앱",
+  "name": "말씀 낭독",
+  "description": "성경 구절을 입력하면 개역개정 본문을 찾아 보여주고 구글 제미나이 목소리로 읽어주는 웹앱",
   "requestFramePermissions": []
 }

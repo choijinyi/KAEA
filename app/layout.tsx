@@ -1,17 +1,30 @@
 import type {Metadata} from 'next';
-import { ReactNode } from 'react';
+import {Noto_Sans_KR, Noto_Serif_KR} from 'next/font/google';
+import {ReactNode} from 'react';
 import './globals.css';
 
+const notoSans = Noto_Sans_KR({
+  subsets: ['latin'],
+  weight: ['400', '500', '700'],
+  variable: '--font-noto-sans',
+});
+
+const notoSerif = Noto_Serif_KR({
+  subsets: ['latin'],
+  weight: ['400', '600', '700'],
+  variable: '--font-noto-serif',
+});
+
 export const metadata: Metadata = {
-  title: 'Playlist Studio — 노래를 유튜브 플레이리스트 영상으로',
+  title: '말씀 낭독 — 성경 읽어주는 앱',
   description:
-    '음악을 업로드하면 AI가 가사를 추출해 자막을 만들고, 곡에 어울리는 배경 그림을 그려 유튜브 플레이리스트 영상을 완성합니다.',
+    '"마태복음 1장"처럼 입력하면 개역개정 성경 본문을 찾아 보여주고, 구글 제미나이의 자연스러운 목소리로 읽어 드립니다.',
 };
 
 export default function RootLayout({children}: {children: ReactNode}) {
   return (
-    <html lang="ko">
-      <body className="bg-zinc-950 font-sans text-zinc-100 antialiased">
+    <html lang="ko" className={`${notoSans.variable} ${notoSerif.variable}`}>
+      <body className="bg-amber-50/40 font-sans text-stone-800 antialiased">
         {children}
       </body>
     </html>
