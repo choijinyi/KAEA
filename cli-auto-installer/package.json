@@ -1,0 +1,55 @@
+{
+  "name": "ai-cli-auto-installer",
+  "productName": "AI CLI Auto Installer",
+  "version": "1.0.0",
+  "description": "Claude CLI · Gemini CLI · ChatGPT(Codex) CLI · Node.js · Python 자동 설치 데스크탑 앱",
+  "main": "main.js",
+  "author": "KAEA",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "kr.kaea.ai-cli-installer",
+    "productName": "AI CLI Auto Installer",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "installer.js",
+      "renderer/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.developer-tools"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Development"
+    }
+  }
+}

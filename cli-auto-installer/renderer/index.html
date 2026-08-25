@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'" />
+  <title>AI CLI Auto Installer</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="ide">
+    <!-- 상단 타이틀 바 -->
+    <header class="titlebar">
+      <div class="traffic">
+        <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+      </div>
+      <div class="title">AI CLI Auto Installer — 개발 환경 자동 설치</div>
+      <div class="platform" id="platform-label"></div>
+    </header>
+
+    <div class="workspace">
+      <!-- 좌측 사이드바: 설치 단계 목록 -->
+      <aside class="sidebar">
+        <div class="sidebar-header">설치 항목</div>
+        <ul id="step-list" class="step-list"></ul>
+
+        <div class="sidebar-footer">
+          <button id="btn-start" class="btn primary">▶ 전체 자동 설치 시작</button>
+          <button id="btn-ide" class="btn" disabled>🗔 IDE(VS Code) 열기</button>
+        </div>
+      </aside>
+
+      <!-- 우측: 터미널 로그 -->
+      <main class="main">
+        <div class="tabbar">
+          <div class="tab active">터미널 — 설치 로그</div>
+        </div>
+        <pre id="terminal" class="terminal">환경을 검사하는 중입니다...
+</pre>
+        <footer class="statusbar">
+          <span id="status-text">준비 중</span>
+          <span id="progress-text"></span>
+        </footer>
+      </main>
+    </div>
+  </div>
+  <script src="renderer.js"></script>
+</body>
+</html>
