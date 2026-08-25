@@ -90,11 +90,30 @@ export default function InstallerPage() {
         <h2 className="mb-2 flex items-center gap-2 text-lg font-semibold text-zinc-200">
           <Download className="h-5 w-5 text-emerald-400" /> 데스크탑 앱으로 설치하기
         </h2>
-        <p className="text-sm leading-relaxed text-zinc-400">
-          터미널이 익숙하지 않다면 IDE 스타일 화면에서 버튼 한 번으로 설치하는 데스크탑 앱(Electron)도 있습니다.
-          저장소의 <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-emerald-300">cli-auto-installer</code> 폴더에서{' '}
-          <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-emerald-300">npm install &amp;&amp; npm start</code>로 실행하거나,{' '}
-          <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-emerald-300">npm run dist:win</code>으로 설치용 exe를 만들 수 있습니다.
+        <p className="mb-4 text-sm leading-relaxed text-zinc-400">
+          터미널이 익숙하지 않다면 IDE 스타일 화면에서 버튼 한 번으로 설치하는 데스크탑 앱을 내려받으세요.
+        </p>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <a
+            href="https://github.com/choijinyi/KAEA/releases/latest/download/AI-CLI-Auto-Installer-win.exe"
+            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white transition hover:bg-emerald-500"
+          >
+            🪟 Windows용 다운로드 (.exe)
+          </a>
+          <a
+            href="https://github.com/choijinyi/KAEA/releases/latest/download/AI-CLI-Auto-Installer-mac.dmg"
+            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-zinc-700 px-4 py-3 font-semibold text-white transition hover:bg-zinc-600"
+          >
+            🍎 macOS용 다운로드 (.dmg)
+          </a>
+        </div>
+        <p className="mt-3 text-xs leading-relaxed text-zinc-500">
+          코드 서명이 없는 앱이라 처음 실행 시 Windows SmartScreen / macOS Gatekeeper 경고가 뜰 수 있습니다.
+          Windows는 &quot;추가 정보 → 실행&quot;, macOS는 앱을 우클릭 → 열기로 실행하세요. 전체 버전 목록은{' '}
+          <a href="https://github.com/choijinyi/KAEA/releases" className="text-emerald-400 underline">
+            GitHub Releases
+          </a>
+          에서 확인할 수 있습니다.
         </p>
       </section>
 

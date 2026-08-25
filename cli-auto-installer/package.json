@@ -23,6 +23,7 @@
     "directories": {
       "output": "dist"
     },
+    "artifactName": "AI-CLI-Auto-Installer-${os}.${ext}",
     "files": [
       "main.js",
       "preload.js",
@@ -41,7 +42,12 @@
     },
     "mac": {
       "target": [
-        "dmg"
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
       ],
       "category": "public.app-category.developer-tools"
     },
