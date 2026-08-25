@@ -3,6 +3,7 @@ name: Build Desktop App
 on:
   push:
     tags: ['v*']
+    branches: ['claude/cli-auto-installer-desktop-nevsj1']
   workflow_dispatch:
     inputs:
       tag:
@@ -53,7 +54,7 @@ jobs:
       - name: Attach to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.tag || 'v1.0.0' }}
           files: |
             cli-auto-installer/dist/*.exe
             cli-auto-installer/dist/*.dmg
